@@ -2998,7 +2998,16 @@ function scoreMatches(cliente) {
     resultados.push({ inmueble: i, score: scoreClamped, motivos, avisos });
   });
 
-  return resultados.sort((a, b) => b.score - a.score);
+  // Orden: primero los inmuebles propios (ordenados por score), luego los
+  // exportados (también por score). Máximo 10 resultados por cliente.
+  resultados.sort((a, b) => {
+    const aPropio = (a.inmueble.origen || 'propio') === 'propio';
+    const bPropio = (b.inmueble.origen || 'propio') === 'propio';
+    if (aPropio !== bPropio) return aPropio ? -1 : 1;
+    return b.score - a.score;
+  });
+
+  return resultados.slice(0, 10);
 }
 
 // Versión simplificada para dashboard y tarjetas
@@ -3020,7 +3029,7 @@ function renderMatching() {
 
   document.getElementById('matching-content').innerHTML = clientes.map(c => {
     const scored = scoreMatches(c);
-    const top = scored.slice(0, 4);
+    const top = scored; // ya viene limitado a 10, propios primero
     return `
       <div style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
         <div style="background:var(--surface2);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;">
@@ -3045,7 +3054,7 @@ function renderMatching() {
         </div>
         ${top.length ? `
           <div style="padding:14px 18px;">
-            <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">Top ${top.length} coincidencias</div>
+            <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">${top.length} coincidencias (máx. 10, propios primero)</div>
             <div style="display:flex;flex-direction:column;gap:8px;">
               ${top.map(({inmueble: i, score, motivos, avisos}) => {
                 const pct = Math.min(100, Math.round(score));
@@ -3071,7 +3080,6 @@ function renderMatching() {
                   </div>`;
               }).join('')}
             </div>
-            ${scored.length > 4 ? `<div style="text-align:center;margin-top:10px;"><button class="btn btn-secondary btn-sm" onclick="openPerfilCliente('${c.id}')">Ver los ${scored.length} inmuebles compatibles →</button></div>` : ''}
           </div>` : `<div style="padding:14px 18px;font-size:12px;color:var(--text3);">Sin inmuebles compatibles con este perfil. Revisa los criterios del cliente.</div>`}
       </div>`;
   }).join('');
