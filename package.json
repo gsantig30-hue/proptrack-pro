@@ -1,0 +1,6 @@
+{
+  "name": "proptrack-pro",
+  "version": "2.0.0",
+  "description": "PropTrack Pro - Plataforma inmobiliaria con Supabase",
+  "private": true
+}
