@@ -1054,6 +1054,11 @@ El chat es el siguiente:
             <option value="negociacion">Negociación</option>
             <option value="vendido">Vendido</option>
           </select>
+          <select class="filter-select" onchange="filterInmuebles()" id="filter-origen">
+            <option value="">Propios y exportados</option>
+            <option value="propio">🏠 Propio</option>
+            <option value="exportado">📦 Exportado WhatsApp</option>
+          </select>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
             <div class="view-toggle">
               <button class="view-btn active" id="view-btn-table" onclick="setInmueblesView('table')">☰ Lista</button>
@@ -1364,8 +1369,37 @@ El chat es el siguiente:
           </select>
         </div>
         <div class="form-group form-full">
-          <label class="form-label">Zona preferida</label>
-          <input type="text" class="form-input" id="c-zona" placeholder="Salamanca, Chamberí, Goya...">
+          <label class="form-label">Zona preferida (puedes elegir varias)</label>
+          <div id="zona-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:0;"></div>
+          <div style="display:flex;gap:8px;">
+            <select class="form-select" id="zona-select" style="flex:1;" onchange="addZonaFromSelect()">
+              <option value="">+ Añadir zona habitual...</option>
+              <option value="Salamanca">Salamanca</option>
+              <option value="Chamberí">Chamberí</option>
+              <option value="Chamartín">Chamartín</option>
+              <option value="Retiro">Retiro</option>
+              <option value="Centro">Centro</option>
+              <option value="Moncloa-Aravaca">Moncloa-Aravaca</option>
+              <option value="Tetuán">Tetuán</option>
+              <option value="Arganzuela">Arganzuela</option>
+              <option value="Fuencarral-El Pardo">Fuencarral-El Pardo</option>
+              <option value="Ciudad Lineal">Ciudad Lineal</option>
+              <option value="Hortaleza">Hortaleza</option>
+              <option value="Carabanchel">Carabanchel</option>
+              <option value="Usera">Usera</option>
+              <option value="Latina">Latina</option>
+              <option value="Vicálvaro">Vicálvaro</option>
+              <option value="Villaverde">Villaverde</option>
+              <option value="Pozuelo de Alarcón">Pozuelo de Alarcón</option>
+              <option value="Las Rozas">Las Rozas</option>
+              <option value="Majadahonda">Majadahonda</option>
+              <option value="Alcobendas">Alcobendas</option>
+              <option value="San Sebastián de los Reyes">San Sebastián de los Reyes</option>
+            </select>
+            <input type="text" class="form-input" id="zona-custom" placeholder="Otra zona..." style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addZonaCustom();}">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addZonaCustom()">+ Añadir</button>
+          </div>
+          <input type="hidden" id="c-zona">
         </div>
         <div class="form-group form-full">
           <label class="form-label">Notas / preferencias adicionales</label>
@@ -1547,6 +1581,7 @@ async function load() {
     renderDashboard();
     if (document.getElementById('panel-inmuebles')?.classList.contains('active')) renderInmueblesTable();
     if (document.getElementById('panel-clientes')?.classList.contains('active')) renderClientesTable();
+    checkNuevosMatches();
   } catch(e) {
     console.error(e);
     showToast('Error cargando datos de Supabase', 'error');
@@ -1571,6 +1606,7 @@ function mapInmuebleFromDB(row) {
     contactoNombre: row.contacto_nombre,
     descripcion: row.descripcion,
     grupo: row.grupo,
+    origen: row.origen || 'propio',
     fechaPublicacion: row.fecha_publicacion,
     fechaSubida: row.fecha_subida,
     notas: row.notas || [],
@@ -1620,6 +1656,7 @@ function mapInmuebleToDB(i) {
     contacto_nombre: i.contactoNombre,
     descripcion: i.descripcion,
     grupo: i.grupo,
+    origen: i.origen || 'propio',
     fecha_publicacion: i.fechaPublicacion || null,
     fecha_subida: i.fechaSubida || new Date().toISOString(),
     notas: i.notas || [],
@@ -1744,6 +1781,40 @@ function openModal(id) {
 }
 
 // ============================================================
+// AVISO DE NUEVOS MATCHES (cualquier coincidencia, por mínima que sea)
+// ============================================================
+function checkNuevosMatches() {
+  try {
+    const vistos = JSON.parse(localStorage.getItem('proptrack_matches_vistos') || '{}');
+    const actuales = {};
+    let nuevosTotal = 0;
+    let clientesConNuevo = 0;
+
+    clientes.forEach(c => {
+      const matchIds = scoreMatches(c).map(r => r.inmueble.id);
+      actuales[c.id] = matchIds;
+      const previos = vistos[c.id] || [];
+      const nuevos = matchIds.filter(id => !previos.includes(id));
+      if (nuevos.length > 0) {
+        nuevosTotal += nuevos.length;
+        clientesConNuevo++;
+      }
+    });
+
+    if (nuevosTotal > 0) {
+      const msg = clientesConNuevo === 1
+        ? `🎯 ${nuevosTotal} ${nuevosTotal===1?'nuevo match':'nuevos matches'} para 1 cliente`
+        : `🎯 ${nuevosTotal} nuevos matches repartidos entre ${clientesConNuevo} clientes`;
+      showToast(msg, 'success');
+    }
+
+    localStorage.setItem('proptrack_matches_vistos', JSON.stringify(actuales));
+  } catch (e) {
+    console.error('Error comprobando nuevos matches', e);
+  }
+}
+
+// ============================================================
 // DASHBOARD
 // ============================================================
 function renderDashboard() {
@@ -1841,6 +1912,12 @@ function opBadge(op) {
     : '<span class="badge badge-purple">Alquiler</span>';
 }
 
+function origenBadge(o) {
+  return o === 'exportado'
+    ? '<span class="badge badge-gray">📦 Exportado</span>'
+    : '<span class="badge badge-orange">🏠 Propio</span>';
+}
+
 function genId() { return Date.now() + Math.random().toString(36).slice(2); }
 
 // ============================================================
@@ -1851,12 +1928,14 @@ function renderInmueblesTable() {
   const tipo = document.getElementById('filter-tipo')?.value||'';
   const op = document.getElementById('filter-op')?.value||'';
   const estado = document.getElementById('filter-estado')?.value||'';
+  const origen = document.getElementById('filter-origen')?.value||'';
 
   let filtered = inmuebles.filter(i => {
     if (q && !(i.direccion||'').toLowerCase().includes(q) && !(i.descripcion||'').toLowerCase().includes(q) && !(i.grupo||'').toLowerCase().includes(q)) return false;
     if (tipo && i.tipo !== tipo) return false;
     if (op && i.operacion !== op) return false;
     if (estado && i.estado !== estado) return false;
+    if (origen && (i.origen||'propio') !== origen) return false;
     return true;
   });
 
@@ -1886,7 +1965,7 @@ function renderInmueblesTable() {
               ${i.planta ? `<span>🏢 ${i.planta}</span>` : ''}
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              ${estadoBadge(i.estado)} ${opBadge(i.operacion)}
+              ${estadoBadge(i.estado)} ${opBadge(i.operacion)} ${origenBadge(i.origen)}
               ${i.garaje==='si' ? '<span class="badge badge-green">🅿️ Garaje</span>' : ''}
               ${i.fotos&&i.fotos.length ? `<span class="badge badge-gray">📸 ${i.fotos.length}</span>` : ''}
             </div>
@@ -1917,6 +1996,7 @@ function renderInmueblesTable() {
         <th>Hab/Baños</th>
         <th>Estado</th>
         <th>Operación</th>
+        <th>Origen</th>
         <th>📅 Publicado</th>
         <th>📥 Subido</th>
         <th></th>
@@ -1934,6 +2014,7 @@ function renderInmueblesTable() {
             <td>${i.habitaciones||'—'} / ${i.banos||'—'}</td>
             <td>${estadoBadge(i.estado)}</td>
             <td>${opBadge(i.operacion)}</td>
+            <td>${origenBadge(i.origen)}</td>
             <td><span class="fecha-badge">${fmtDate(i.fechaPublicacion)}</span></td>
             <td><span class="fecha-badge">${fmtDate(i.fechaSubida)}</span></td>
             <td class="relative" onclick="event.stopPropagation()">
@@ -2051,10 +2132,12 @@ async function saveInmueble() {
     const idx = inmuebles.findIndex(x => x.id === editingId);
     data.id = editingId;
     data.fechaSubida = inmuebles[idx].fechaSubida;
+    data.origen = inmuebles[idx].origen || 'propio';
     inmuebles[idx] = {...inmuebles[idx], ...data};
   } else {
     data.id = genId();
     data.fechaSubida = new Date().toISOString();
+    data.origen = 'propio';
     inmuebles.push(data);
   }
   const ok = await dbUpsertInmueble(data);
@@ -2062,6 +2145,7 @@ async function saveInmueble() {
   closeModal('modal-inmueble');
   showToast(editingId ? 'Inmueble actualizado' : 'Inmueble añadido ✓');
   renderInmueblesTable();
+  setTimeout(checkNuevosMatches, 1600);
 }
 
 // ============================================================
@@ -2083,7 +2167,7 @@ function openDetail(id) {
 
   const camposBadges = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-      ${estadoBadge(i.estado)} ${opBadge(i.operacion)}
+      ${estadoBadge(i.estado)} ${opBadge(i.operacion)} ${origenBadge(i.origen)}
       ${i.garaje==='si' ? '<span class="badge badge-green">🅿️ Garaje</span>' : ''}
     </div>`;
 
@@ -2259,6 +2343,7 @@ async function importJSON() {
       contactoNombre: item.contactoNombre || null,
       descripcion: item.descripcion || null,
       grupo: item.grupo || null,
+      origen: 'exportado',
       fechaPublicacion: item.fechaPublicacion || fechaManual || null,
       fechaSubida: now,
       fotos: [],
@@ -2277,6 +2362,7 @@ async function importJSON() {
   document.getElementById('json-preview').innerHTML = '';
   showToast(`${added} inmuebles importados ✓`);
   renderInmueblesTable();
+  setTimeout(checkNuevosMatches, 1600);
 }
 
 function copyPrompt() {
@@ -2582,6 +2668,52 @@ function toggleClienteDropdown(e, id) {
   setTimeout(() => document.addEventListener('click', closeDropdown, {once:true}), 50);
 }
 
+// ============================================================
+// ZONA PREFERIDA — selector de varias opciones (chips)
+// ============================================================
+let zonasSeleccionadas = [];
+
+function setZonaChips(zonas) {
+  zonasSeleccionadas = [...new Set(zonas.filter(z => z))];
+  renderZonaChips();
+}
+
+function renderZonaChips() {
+  const cont = document.getElementById('zona-chips');
+  if (!cont) return;
+  cont.innerHTML = zonasSeleccionadas.map((z, idx) => `
+    <span class="badge badge-blue" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;">
+      ${z}
+      <span style="cursor:pointer;font-weight:700;" onclick="removeZonaChip(${idx})">×</span>
+    </span>`).join('');
+  document.getElementById('c-zona').value = zonasSeleccionadas.join(', ');
+}
+
+function addZonaFromSelect() {
+  const sel = document.getElementById('zona-select');
+  const val = sel.value.trim();
+  if (val && !zonasSeleccionadas.includes(val)) {
+    zonasSeleccionadas.push(val);
+    renderZonaChips();
+  }
+  sel.value = '';
+}
+
+function addZonaCustom() {
+  const input = document.getElementById('zona-custom');
+  const val = input.value.trim();
+  if (val && !zonasSeleccionadas.includes(val)) {
+    zonasSeleccionadas.push(val);
+    renderZonaChips();
+  }
+  input.value = '';
+}
+
+function removeZonaChip(idx) {
+  zonasSeleccionadas.splice(idx, 1);
+  renderZonaChips();
+}
+
 function openAddClienteModal() {
   editingClienteId = null;
   document.getElementById('modal-cliente-title').textContent = 'Nuevo cliente';
@@ -2593,6 +2725,7 @@ function openAddClienteModal() {
   document.getElementById('c-operacion').value = 'venta';
   document.getElementById('c-garaje').value = 'indiferente';
   document.getElementById('c-estado-pref').value = 'cualquiera';
+  setZonaChips([]);
   openModal('modal-cliente');
 }
 
@@ -2612,7 +2745,7 @@ function openEditClienteModal(id) {
   document.getElementById('c-operacion').value = c.operacion||'venta';
   document.getElementById('c-garaje').value = c.garaje||'indiferente';
   document.getElementById('c-estado-pref').value = c.estadoPref||'cualquiera';
-  document.getElementById('c-zona').value = c.zona||'';
+  setZonaChips((c.zona||'').split(',').map(z => z.trim()).filter(z => z));
   document.getElementById('c-notas').value = c.notas||'';
   openModal('modal-cliente');
 }
@@ -2650,6 +2783,7 @@ async function saveCliente() {
   closeModal('modal-cliente');
   renderClientesTable();
   showToast(editingClienteId ? 'Cliente actualizado' : 'Cliente añadido ✓');
+  setTimeout(checkNuevosMatches, 1600);
 }
 
 // ============================================================
@@ -2746,41 +2880,42 @@ function scoreMatches(cliente) {
     let score = 0;
     const motivos = [];
     const avisos = [];
-    let descalificado = false;
 
-    // --- CRITERIOS ELIMINATORIOS (descalifican si no se cumplen) ---
+    // --- CRITERIOS QUE PENALIZAN FUERTE (ya no descalifican del todo) ---
+    // Antes estos criterios quitaban el inmueble por completo de los matches.
+    // Ahora restan mucha puntuación y quedan anotados como aviso, para que
+    // cualquier coincidencia, por mínima que sea, se pueda revisar.
 
-    // Operación — si el cliente quiere solo venta y el inmueble es alquiler, fuera
+    // Operación — si el cliente quiere solo venta y el inmueble es alquiler
     if (cliente.operacion !== 'ambas' && i.operacion !== cliente.operacion) {
-      descalificado = true;
+      score -= 40; avisos.push(`Operación distinta (busca ${cliente.operacion})`);
     }
 
-    // Tipo — si no es cualquiera y no coincide, fuera
+    // Tipo — si no es cualquiera y no coincide
     if (cliente.tipo && cliente.tipo !== 'cualquiera' && i.tipo !== cliente.tipo) {
-      descalificado = true;
+      score -= 30; avisos.push(`Tipo distinto (busca ${cliente.tipo})`);
     }
 
-    // Presupuesto máximo — más de un 15% por encima, fuera
+    // Presupuesto máximo — más de un 15% por encima
     if (cliente.presupuesto && i.precio && i.precio > cliente.presupuesto * 1.15) {
-      descalificado = true;
+      const exceso = Math.round(((i.precio / cliente.presupuesto) - 1) * 100);
+      score -= 35; avisos.push(`Supera presupuesto en ${exceso}%`);
     }
 
-    // Habitaciones mínimas — si tiene menos de las requeridas, fuera
+    // Habitaciones mínimas — si tiene menos de las requeridas
     if (cliente.habMin && i.habitaciones && i.habitaciones < cliente.habMin) {
-      descalificado = true;
+      score -= 20; avisos.push(`Menos habitaciones de las pedidas (${i.habitaciones}/${cliente.habMin})`);
     }
 
-    // Metros mínimos — si tiene menos, fuera
+    // Metros mínimos — si tiene bastantes menos
     if (cliente.metrosMin && i.metros && i.metros < cliente.metrosMin * 0.85) {
-      descalificado = true;
+      score -= 20; avisos.push(`Menos metros de los pedidos (${i.metros}m²/${cliente.metrosMin}m²)`);
     }
 
     // Garaje obligatorio
     if (cliente.garaje === 'si' && i.garaje === 'no') {
-      descalificado = true;
+      score -= 15; avisos.push('Sin garaje (lo necesita)');
     }
-
-    if (descalificado) return;
 
     // --- PUNTUACIÓN POR CRITERIOS (suma hasta 100) ---
 
@@ -2797,7 +2932,7 @@ function scoreMatches(cliente) {
       score += 20;
     }
 
-    // Zona (25 pts)
+    // Zona (25 pts) — el cliente puede tener varias zonas separadas por coma
     if (cliente.zona && i.direccion) {
       const zonas = cliente.zona.toLowerCase().split(/[,;\/]/).map(z => z.trim()).filter(z => z);
       const dirLow = i.direccion.toLowerCase();
@@ -2852,9 +2987,15 @@ function scoreMatches(cliente) {
       else if (hits.length === 1) { score += 2; }
     }
 
-    if (motivos.length === 0) motivos.push('Compatible');
+    if (motivos.length === 0 && avisos.length === 0) motivos.push('Compatible');
+    if (motivos.length === 0 && avisos.length > 0) motivos.push('Coincidencia mínima');
 
-    resultados.push({ inmueble: i, score, motivos, avisos });
+    // Score visible nunca baja de 1 si hay al menos algo de afinidad real (motivos),
+    // ni se oculta del todo aunque tenga muchos avisos: todo match, por pequeño
+    // que sea, se anota y se muestra.
+    const scoreClamped = Math.max(1, Math.round(score));
+
+    resultados.push({ inmueble: i, score: scoreClamped, motivos, avisos });
   });
 
   return resultados.sort((a, b) => b.score - a.score);
@@ -2908,13 +3049,15 @@ function renderMatching() {
             <div style="display:flex;flex-direction:column;gap:8px;">
               ${top.map(({inmueble: i, score, motivos, avisos}) => {
                 const pct = Math.min(100, Math.round(score));
-                const color = pct >= 80 ? '#2A7A4B' : pct >= 60 ? '#D47A1A' : '#6B4E8A';
+                const color = pct >= 80 ? '#2A7A4B' : pct >= 60 ? '#D47A1A' : pct >= 30 ? '#6B4E8A' : '#B33A3A';
+                const esDebil = pct < 30;
                 return `
-                  <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);cursor:pointer;" onclick="openDetail('${i.id}')">
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid ${esDebil?'#E0B8B8':'var(--border)'};cursor:pointer;" onclick="openDetail('${i.id}')">
                     ${i.fotos&&i.fotos.length?`<img src="${i.fotos[0]}" style="width:48px;height:40px;object-fit:cover;border-radius:5px;flex-shrink:0;">`:`<div style="width:48px;height:40px;background:var(--surface2);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:18px;">${tipoIcon(i.tipo)}</div>`}
                     <div style="flex:1;min-width:0;">
-                      <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.direccion||'Sin dirección'}</div>
-                      <div style="font-size:11px;color:var(--text3);">${motivos.slice(0,3).join(' · ')}${avisos.length?' · ⚠️'+avisos[0]:''}</div>
+                      <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.direccion||'Sin dirección'} ${origenBadge(i.origen)}</div>
+                      <div style="font-size:11px;color:var(--text3);">${motivos.slice(0,3).join(' · ')}</div>
+                      ${avisos.length ? `<div style="font-size:11px;color:#B33A3A;margin-top:2px;">⚠️ ${avisos.slice(0, esDebil ? avisos.length : 1).join(' · ')}</div>` : ''}
                     </div>
                     <div style="flex-shrink:0;text-align:right;">
                       <div style="font-size:14px;font-weight:700;color:var(--accent);">${i.precio?fmt(i.precio)+'€'+(i.operacion==='alquiler'?'/mes':''):'—'}</div>
