@@ -849,6 +849,29 @@
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div id="login-screen" style="position:fixed;inset:0;background:#1A1916;z-index:5000;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#F7F6F3;border-radius:16px;padding:40px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+    <div style="text-align:center;margin-bottom:28px;">
+      <h1 style="font-family:'Playfair Display',serif;font-size:26px;color:#1A1916;">PropTrack</h1>
+      <span style="font-size:11px;color:#9C9890;letter-spacing:1.5px;text-transform:uppercase;">Pro Edition</span>
+    </div>
+    <div id="login-error" style="display:none;background:#FFF0EE;color:#C0392B;border:1px solid #FCCBC7;border-radius:7px;padding:10px 14px;font-size:12px;margin-bottom:14px;"></div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label style="font-size:11px;font-weight:600;color:#6B6760;text-transform:uppercase;letter-spacing:0.6px;display:block;margin-bottom:5px;">Contraseña de administrador</label>
+        <input type="password" id="login-password" placeholder="Déjalo vacío para acceso de solo vista" style="width:100%;padding:10px 12px;border:1px solid #E2DED6;border-radius:7px;font-size:13px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button onclick="doLogin()" style="background:#2C5F8A;color:#fff;border:none;padding:11px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;">Entrar</button>
+      <button onclick="enterAsVista()" style="background:none;color:#6B6760;border:1px solid #E2DED6;padding:11px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;">👁 Entrar solo en modo vista</button>
+    </div>
+    <div style="text-align:center;margin-top:20px;font-size:11px;color:#9C9890;">Acceso de administrador o vista de solo lectura</div>
+  </div>
+</div>
+
+<!-- APP WRAPPER (oculto hasta login) -->
+<div id="app-wrapper" style="display:none;">
+
 <!-- SIDEBAR -->
 <div id="sidebar">
   <div class="sidebar-logo">
@@ -884,7 +907,10 @@
       <span class="icon">📄</span> Informes PDF
     </div>
   </nav>
-  <div class="sidebar-bottom">v2.0 · Local</div>
+  <div class="sidebar-bottom" style="display:flex;justify-content:space-between;align-items:center;">
+    <span>v2.0 · Online</span>
+    <button onclick="logout()" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:11px;cursor:pointer;text-decoration:underline;">Salir</button>
+  </div>
 </div>
 
 <!-- MAIN -->
@@ -998,7 +1024,7 @@ El chat es el siguiente:
       <!-- AÑADIR MANUAL -->
       <div class="card">
         <div class="card-title">Añadir inmueble manualmente</div>
-        <button class="btn btn-primary" onclick="openAddModal()">+ Nuevo inmueble</button>
+        <button class="btn btn-primary admin-only" onclick="openAddModal()">+ Nuevo inmueble</button>
       </div>
     </div>
 
@@ -1033,7 +1059,7 @@ El chat es el siguiente:
               <button class="view-btn active" id="view-btn-table" onclick="setInmueblesView('table')">☰ Lista</button>
               <button class="view-btn" id="view-btn-cards" onclick="setInmueblesView('cards')">⊞ Tarjetas</button>
             </div>
-            <button class="btn btn-danger btn-sm" onclick="confirmDeleteAll('inmuebles')">🗑 Borrar todos</button>
+            <button class="btn btn-danger btn-sm admin-only" onclick="confirmDeleteAll('inmuebles')">🗑 Borrar todos</button>
           </div>
         </div>
         <div id="inmuebles-table-body"></div>
@@ -1076,8 +1102,8 @@ El chat es el siguiente:
               <button class="view-btn active" id="view-btn-cli-table" onclick="setClientesView('table')">☰ Lista</button>
               <button class="view-btn" id="view-btn-cli-cards" onclick="setClientesView('cards')">⊞ Tarjetas</button>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="openAddClienteModal()">+ Nuevo cliente</button>
-            <button class="btn btn-danger btn-sm" onclick="confirmDeleteAll('clientes')">🗑 Borrar todos</button>
+            <button class="btn btn-primary btn-sm admin-only" onclick="openAddClienteModal()">+ Nuevo cliente</button>
+            <button class="btn btn-danger btn-sm admin-only" onclick="confirmDeleteAll('clientes')">🗑 Borrar todos</button>
           </div>
         </div>
         <div id="clientes-table-body"></div>
@@ -1234,22 +1260,12 @@ El chat es el siguiente:
           <input type="date" class="form-input" id="f-fechaPublicacion">
         </div>
         <div class="form-group form-full">
-          <label class="form-label">Descripción</label>
-          <textarea class="form-textarea" id="f-descripcion" placeholder="Descripción del inmueble..."></textarea>
+          <label class="form-label">🔗 URL del portal (Idealista, Fotocasa...)</label>
+          <input type="text" class="form-input" id="f-urlPortal" placeholder="https://www.idealista.com/inmueble/...">
         </div>
         <div class="form-group form-full">
-          <label class="form-label">📸 Fotos — arrastra imágenes o haz clic para seleccionar</label>
-          <div class="photos-upload-area" id="photos-drop-area"
-               onclick="document.getElementById('photos-input').click()"
-               ondragover="event.preventDefault();this.classList.add('drag-over')"
-               ondragleave="this.classList.remove('drag-over')"
-               ondrop="handlePhotosDrop(event)">
-            <input type="file" id="photos-input" multiple accept="image/*" onchange="handlePhotosInput(this.files)">
-            <div style="font-size:28px;margin-bottom:8px;">🖼️</div>
-            <div style="font-size:13px;font-weight:500;">Arrastra fotos aquí o haz clic</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:4px;">JPG, PNG, WebP · Puedes seleccionar varias a la vez</div>
-          </div>
-          <div class="photos-preview" id="photos-preview"></div>
+          <label class="form-label">Descripción</label>
+          <textarea class="form-textarea" id="f-descripcion" placeholder="Descripción del inmueble..."></textarea>
         </div>
       </div>
     </div>
@@ -1301,13 +1317,19 @@ El chat es el siguiente:
           <input type="number" class="form-input" id="c-presupuesto" placeholder="400000">
         </div>
         <div class="form-group">
+          <label class="form-label">Presupuesto mín. (€)</label>
+          <input type="number" class="form-input" id="c-presupuesto-min" placeholder="200000">
+        </div>
+        <div class="form-group">
           <label class="form-label">Tipo buscado</label>
           <select class="form-select" id="c-tipo">
-            <option value="piso">Piso</option>
             <option value="cualquiera">Cualquiera</option>
+            <option value="piso">Piso</option>
             <option value="local">Local</option>
             <option value="edificio">Edificio</option>
             <option value="terreno">Terreno</option>
+            <option value="garaje">Garaje</option>
+            <option value="oficina">Oficina</option>
           </select>
         </div>
         <div class="form-group">
@@ -1318,13 +1340,36 @@ El chat es el siguiente:
             <option value="ambas">Ambas</option>
           </select>
         </div>
-        <div class="form-group form-full">
-          <label class="form-label">Zona preferida</label>
-          <input type="text" class="form-input" id="c-zona" placeholder="Salamanca, Chamberí...">
+        <div class="form-group">
+          <label class="form-label">Metros mínimos</label>
+          <input type="number" class="form-input" id="c-metros-min" placeholder="70">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Habitaciones mínimas</label>
+          <input type="number" class="form-input" id="c-hab-min" placeholder="2">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Garaje</label>
+          <select class="form-select" id="c-garaje">
+            <option value="indiferente">Indiferente</option>
+            <option value="si">Necesita garaje</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado del inmueble</label>
+          <select class="form-select" id="c-estado-pref">
+            <option value="cualquiera">Cualquiera</option>
+            <option value="reformado">Reformado</option>
+            <option value="reformar">Para reformar</option>
+          </select>
         </div>
         <div class="form-group form-full">
-          <label class="form-label">Notas / preferencias</label>
-          <textarea class="form-textarea" id="c-notas" placeholder="Busca exterior, con garaje, reformado..."></textarea>
+          <label class="form-label">Zona preferida</label>
+          <input type="text" class="form-input" id="c-zona" placeholder="Salamanca, Chamberí, Goya...">
+        </div>
+        <div class="form-group form-full">
+          <label class="form-label">Notas / preferencias adicionales</label>
+          <textarea class="form-textarea" id="c-notas" placeholder="Exterior, planta alta, ascensor, sin bajos, cerca de colegios..."></textarea>
         </div>
       </div>
     </div>
@@ -1332,6 +1377,21 @@ El chat es el siguiente:
       <button class="btn btn-secondary" onclick="closeModal('modal-cliente')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveCliente()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL PERFIL CLIENTE -->
+<div class="modal-overlay" id="modal-perfil-cliente">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="perfil-cliente-titulo"></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:3px;" id="perfil-cliente-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-perfil-cliente')">×</button>
+    </div>
+    <div class="modal-body" id="perfil-cliente-body"></div>
+    <div class="modal-footer" id="perfil-cliente-footer"></div>
   </div>
 </div>
 
@@ -1360,7 +1420,22 @@ El chat es el siguiente:
 <!-- DROPDOWN CONTAINER -->
 <div id="dropdown-container"></div>
 
+</div><!-- end app-wrapper -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
+// ============================================================
+// CONFIGURACIÓN SUPABASE — rellena con tus datos del proyecto
+// ============================================================
+const SUPABASE_URL = 'https://bsrwomntfrqbiwoynpnz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzcndvbW50ZnJxYml3b3lucG56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MDc2MDksImV4cCI6MjA5ODM4MzYwOX0.nS6UtqfqB214sZgQxHW0nfoYPffqV9ZEGATS2UISp7A';
+const ADMIN_PASSWORD = 'santiago2003';
+
+let supabaseClient = null;
+try {
+  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch(e) { console.error('Error inicializando Supabase', e); }
+
 // ============================================================
 // ESTADO GLOBAL
 // ============================================================
@@ -1368,24 +1443,247 @@ let inmuebles = [];
 let clientes = [];
 let editingId = null;
 let editingClienteId = null;
-let currentPhotos = []; // base64 array for current edit
+let currentPhotos = []; // no usado en versión online (sin fotos)
 let confirmCallback = null;
 let map = null;
 let markers = [];
 let inmueblesView = 'table'; // 'table' | 'cards'
 let clientesView = 'table';  // 'table' | 'cards'
+let userRole = null; // 'admin' | 'vista'
 
 // ============================================================
-// PERSISTENCIA
+// LOGIN / ROLES
 // ============================================================
-function save() {
-  localStorage.setItem('proptrack_inmuebles', JSON.stringify(inmuebles));
-  localStorage.setItem('proptrack_clientes', JSON.stringify(clientes));
+function doLogin() {
+  const pass = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  if (pass === ADMIN_PASSWORD) {
+    userRole = 'admin';
+    sessionStorage.setItem('proptrack_role', 'admin');
+    enterApp();
+  } else if (pass === '') {
+    enterAsVista();
+  } else {
+    errEl.textContent = 'Contraseña incorrecta';
+    errEl.style.display = 'block';
+  }
 }
 
-function load() {
-  try { inmuebles = JSON.parse(localStorage.getItem('proptrack_inmuebles') || '[]'); } catch(e) { inmuebles = []; }
-  try { clientes = JSON.parse(localStorage.getItem('proptrack_clientes') || '[]'); } catch(e) { clientes = []; }
+function enterAsVista() {
+  userRole = 'vista';
+  sessionStorage.setItem('proptrack_role', 'vista');
+  enterApp();
+}
+
+function enterApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-wrapper').style.display = 'flex';
+  applyRoleRestrictions();
+  load();
+}
+
+function logout() {
+  sessionStorage.removeItem('proptrack_role');
+  userRole = null;
+  location.reload();
+}
+
+// Oculta elementos de edición si el usuario es de solo vista
+function applyRoleRestrictions() {
+  if (userRole === 'admin') return; // admin ve todo
+
+  // Inyecta CSS que oculta todo lo marcado como "solo admin"
+  const style = document.createElement('style');
+  style.id = 'vista-restrictions';
+  style.textContent = `
+    .admin-only { display: none !important; }
+  `;
+  document.head.appendChild(style);
+
+  // Añade badge de modo vista en la topbar
+  const badge = document.createElement('div');
+  badge.style.cssText = 'background:#FFF3E0;color:#D47A1A;font-size:11px;font-weight:600;padding:4px 10px;border-radius:14px;margin-right:10px;';
+  badge.textContent = '👁 Modo vista (solo lectura)';
+  document.getElementById('topbar-actions').parentElement.insertBefore(badge, document.getElementById('topbar-actions'));
+
+  // Guard real a nivel de función: bloquea escritura aunque se llame desde consola
+  const blockedFns = [
+    'openAddModal','openEditModal','saveInmueble','confirmDeleteOne','confirmDeleteAll',
+    'changeEstado','addNota','openAddClienteModal','openEditClienteModal','saveCliente',
+    'confirmDeleteCliente','importJSON'
+  ];
+  blockedFns.forEach(fnName => {
+    const original = window[fnName];
+    if (typeof original !== 'function') return;
+    window[fnName] = function(...args) {
+      showToast('Estás en modo vista — solo lectura', 'error');
+    };
+  });
+}
+
+// ============================================================
+// PERSISTENCIA — SUPABASE
+// ============================================================
+async function save() {
+  // En la versión Supabase, save() ya no se usa de forma global;
+  // cada operación (crear/editar/borrar) llama directamente a Supabase.
+  // Esta función queda como no-op de compatibilidad para el código existente.
+}
+
+async function load() {
+  if (!supabaseClient) { showToast('Supabase no configurado', 'error'); return; }
+  try {
+    const { data: inmueblesData, error: errInm } = await supabaseClient
+      .from('inmuebles').select('*').order('fecha_subida', { ascending: false });
+    if (errInm) throw errInm;
+
+    const { data: clientesData, error: errCli } = await supabaseClient
+      .from('clientes').select('*').order('fecha_subida', { ascending: false });
+    if (errCli) throw errCli;
+
+    inmuebles = (inmueblesData || []).map(mapInmuebleFromDB);
+    clientes = (clientesData || []).map(mapClienteFromDB);
+
+    renderDashboard();
+    if (document.getElementById('panel-inmuebles')?.classList.contains('active')) renderInmueblesTable();
+    if (document.getElementById('panel-clientes')?.classList.contains('active')) renderClientesTable();
+  } catch(e) {
+    console.error(e);
+    showToast('Error cargando datos de Supabase', 'error');
+  }
+}
+
+// Convierte fila de Supabase (snake_case) al formato JS (camelCase) que usa la UI
+function mapInmuebleFromDB(row) {
+  return {
+    id: row.id,
+    tipo: row.tipo,
+    operacion: row.operacion,
+    estado: row.estado,
+    precio: row.precio,
+    direccion: row.direccion,
+    metros: row.metros,
+    habitaciones: row.habitaciones,
+    banos: row.banos,
+    planta: row.planta,
+    garaje: row.garaje,
+    telefono: row.telefono,
+    contactoNombre: row.contacto_nombre,
+    descripcion: row.descripcion,
+    grupo: row.grupo,
+    fechaPublicacion: row.fecha_publicacion,
+    fechaSubida: row.fecha_subida,
+    notas: row.notas || [],
+    _lat: row.lat,
+    _lng: row.lng,
+    _approx: row.ubicacion_aproximada,
+    urlPortal: row.url_portal,
+    fotos: [] // sin fotos en versión online
+  };
+}
+
+function mapClienteFromDB(row) {
+  return {
+    id: row.id,
+    nombre: row.nombre,
+    telefono: row.telefono,
+    email: row.email,
+    presupuesto: row.presupuesto,
+    presupuestoMin: row.presupuesto_min,
+    tipo: row.tipo,
+    operacion: row.operacion,
+    metrosMin: row.metros_min,
+    habMin: row.hab_min,
+    garaje: row.garaje,
+    estadoPref: row.estado_pref,
+    zona: row.zona,
+    notas: row.notas,
+    fechaSubida: row.fecha_subida
+  };
+}
+
+// Convierte un inmueble JS al formato de fila de Supabase
+function mapInmuebleToDB(i) {
+  return {
+    id: i.id,
+    tipo: i.tipo,
+    operacion: i.operacion,
+    estado: i.estado,
+    precio: i.precio,
+    direccion: i.direccion,
+    metros: i.metros,
+    habitaciones: i.habitaciones,
+    banos: i.banos,
+    planta: i.planta,
+    garaje: i.garaje,
+    telefono: i.telefono,
+    contacto_nombre: i.contactoNombre,
+    descripcion: i.descripcion,
+    grupo: i.grupo,
+    fecha_publicacion: i.fechaPublicacion || null,
+    fecha_subida: i.fechaSubida || new Date().toISOString(),
+    notas: i.notas || [],
+    lat: i._lat || null,
+    lng: i._lng || null,
+    ubicacion_aproximada: i._approx || false,
+    url_portal: i.urlPortal || null
+  };
+}
+
+function mapClienteToDB(c) {
+  return {
+    id: c.id,
+    nombre: c.nombre,
+    telefono: c.telefono,
+    email: c.email,
+    presupuesto: c.presupuesto,
+    presupuesto_min: c.presupuestoMin,
+    tipo: c.tipo,
+    operacion: c.operacion,
+    metros_min: c.metrosMin,
+    hab_min: c.habMin,
+    garaje: c.garaje,
+    estado_pref: c.estadoPref,
+    zona: c.zona,
+    notas: c.notas,
+    fecha_subida: c.fechaSubida || new Date().toISOString()
+  };
+}
+
+async function dbUpsertInmueble(i) {
+  const { error } = await supabaseClient.from('inmuebles').upsert(mapInmuebleToDB(i));
+  if (error) { console.error(error); showToast('Error guardando en Supabase', 'error'); return false; }
+  return true;
+}
+
+async function dbDeleteInmueble(id) {
+  const { error } = await supabaseClient.from('inmuebles').delete().eq('id', id);
+  if (error) { console.error(error); showToast('Error eliminando en Supabase', 'error'); return false; }
+  return true;
+}
+
+async function dbDeleteAllInmuebles() {
+  const { error } = await supabaseClient.from('inmuebles').delete().neq('id', '___none___');
+  if (error) { console.error(error); return false; }
+  return true;
+}
+
+async function dbUpsertCliente(c) {
+  const { error } = await supabaseClient.from('clientes').upsert(mapClienteToDB(c));
+  if (error) { console.error(error); showToast('Error guardando en Supabase', 'error'); return false; }
+  return true;
+}
+
+async function dbDeleteCliente(id) {
+  const { error } = await supabaseClient.from('clientes').delete().eq('id', id);
+  if (error) { console.error(error); showToast('Error eliminando en Supabase', 'error'); return false; }
+  return true;
+}
+
+async function dbDeleteAllClientes() {
+  const { error } = await supabaseClient.from('clientes').delete().neq('id', '___none___');
+  if (error) { console.error(error); return false; }
+  return true;
 }
 
 // ============================================================
@@ -1421,7 +1719,7 @@ function showPanel(name) {
 
 function addInmueblesTopbarBtn() {
   document.getElementById('topbar-actions').innerHTML =
-    '<button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Añadir inmueble</button>';
+    '<button class="btn btn-primary btn-sm admin-only" onclick="openAddModal()">+ Añadir inmueble</button>';
 }
 
 // ============================================================
@@ -1599,8 +1897,8 @@ function renderInmueblesTable() {
               ${i.grupo ? `<div style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">💬 ${i.grupo}</div>` : ''}
             </div>
             <div style="display:flex;gap:6px;" onclick="event.stopPropagation()">
-              <button class="btn btn-secondary btn-sm" onclick="openEditModal('${i.id}')">✏️</button>
-              <button class="btn btn-danger btn-sm" onclick="confirmDeleteOne('${i.id}')">🗑</button>
+              <button class="btn btn-secondary btn-sm admin-only" onclick="openEditModal('${i.id}')">✏️</button>
+              <button class="btn btn-danger btn-sm admin-only" onclick="confirmDeleteOne('${i.id}')">🗑</button>
             </div>
           </div>
         </div>`;
@@ -1692,14 +1990,12 @@ function closeDropdown() {
 // ============================================================
 function openAddModal() {
   editingId = null;
-  currentPhotos = [];
   document.getElementById('modal-inmueble-title').textContent = 'Nuevo inmueble';
-  ['tipo','operacion','direccion','precio','metros','habitaciones','banos','planta','garaje','estado','telefono','contacto','grupo','descripcion','fechaPublicacion'].forEach(f => {
+  ['tipo','operacion','direccion','precio','metros','habitaciones','banos','planta','garaje','estado','telefono','contacto','grupo','descripcion','fechaPublicacion','urlPortal'].forEach(f => {
     const el = document.getElementById('f-'+f);
     if (el) el.value = f === 'estado' ? 'disponible' : f === 'garaje' ? 'no' : '';
   });
   document.getElementById('f-fechaPublicacion').value = '';
-  document.getElementById('photos-preview').innerHTML = '';
   openModal('modal-inmueble');
 }
 
@@ -1707,7 +2003,6 @@ function openEditModal(id) {
   const i = inmuebles.find(x => x.id === id);
   if (!i) return;
   editingId = id;
-  currentPhotos = [...(i.fotos||[])];
   document.getElementById('modal-inmueble-title').textContent = 'Editar inmueble';
   document.getElementById('f-tipo').value = i.tipo||'piso';
   document.getElementById('f-operacion').value = i.operacion||'venta';
@@ -1724,11 +2019,11 @@ function openEditModal(id) {
   document.getElementById('f-grupo').value = i.grupo||'';
   document.getElementById('f-descripcion').value = i.descripcion||'';
   document.getElementById('f-fechaPublicacion').value = i.fechaPublicacion||'';
-  renderPhotosPreview();
+  document.getElementById('f-urlPortal').value = i.urlPortal||'';
   openModal('modal-inmueble');
 }
 
-function saveInmueble() {
+async function saveInmueble() {
   const direccion = document.getElementById('f-direccion').value.trim();
   if (!direccion) { showToast('La dirección es obligatoria', 'error'); return; }
 
@@ -1748,58 +2043,25 @@ function saveInmueble() {
     grupo: document.getElementById('f-grupo').value||null,
     descripcion: document.getElementById('f-descripcion').value||null,
     fechaPublicacion: document.getElementById('f-fechaPublicacion').value||null,
-    fotos: [...currentPhotos]
+    urlPortal: document.getElementById('f-urlPortal').value||null,
+    fotos: []
   };
 
   if (editingId) {
     const idx = inmuebles.findIndex(x => x.id === editingId);
+    data.id = editingId;
+    data.fechaSubida = inmuebles[idx].fechaSubida;
     inmuebles[idx] = {...inmuebles[idx], ...data};
   } else {
     data.id = genId();
     data.fechaSubida = new Date().toISOString();
     inmuebles.push(data);
   }
-  save();
+  const ok = await dbUpsertInmueble(data);
+  if (!ok) return;
   closeModal('modal-inmueble');
   showToast(editingId ? 'Inmueble actualizado' : 'Inmueble añadido ✓');
   renderInmueblesTable();
-}
-
-// ============================================================
-// FOTOS
-// ============================================================
-function handlePhotosInput(files) {
-  Array.from(files).forEach(f => readPhotoFile(f));
-}
-
-function handlePhotosDrop(e) {
-  e.preventDefault();
-  document.getElementById('photos-drop-area').classList.remove('drag-over');
-  const files = e.dataTransfer.files;
-  Array.from(files).filter(f => f.type.startsWith('image/')).forEach(f => readPhotoFile(f));
-}
-
-function readPhotoFile(file) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    currentPhotos.push(e.target.result);
-    renderPhotosPreview();
-  };
-  reader.readAsDataURL(file);
-}
-
-function renderPhotosPreview() {
-  document.getElementById('photos-preview').innerHTML = currentPhotos.map((src, idx) =>
-    `<div class="photo-thumb">
-      <img src="${src}" alt="foto ${idx+1}">
-      <button class="remove-photo" onclick="removePhoto(${idx})">×</button>
-    </div>`
-  ).join('');
-}
-
-function removePhoto(idx) {
-  currentPhotos.splice(idx, 1);
-  renderPhotosPreview();
 }
 
 // ============================================================
@@ -1812,11 +2074,12 @@ function openDetail(id) {
   document.getElementById('detalle-titulo').textContent = i.direccion||'Sin dirección';
   document.getElementById('detalle-subtitulo').textContent = `${tipoIcon(i.tipo)} ${i.tipo} · ${i.operacion} · ${estadoBadge(i.estado).replace(/<[^>]*>/g,'')}`;
 
-  const fotos = (i.fotos||[]).length
-    ? `<div class="detail-photos">${i.fotos.map(src =>
-        `<img src="${src}" onclick="openLightbox('${src.replace(/'/g,"\\'")}')">`)
-      .join('')}</div>`
-    : '';
+  const portalLink = i.urlPortal ? `
+    <div style="margin-bottom:14px;">
+      <a href="${i.urlPortal}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--accent);background:var(--bg);padding:8px 14px;border-radius:7px;border:1px solid var(--border);text-decoration:none;">
+        🔗 Ver anuncio publicado
+      </a>
+    </div>` : '';
 
   const camposBadges = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
@@ -1855,21 +2118,42 @@ function openDetail(id) {
         ${notas.map(n => `<div class="note-item">${n.texto}<div class="note-meta">${fmtDate(n.fecha)}</div></div>`).join('')}
         ${!notas.length ? '<div style="font-size:12px;color:var(--text3);">Sin notas</div>' : ''}
       </div>
-      <div style="display:flex;gap:8px;margin-top:10px;">
+      <div style="display:flex;gap:8px;margin-top:10px;" class="admin-only">
         <input type="text" class="form-input" id="nota-input" placeholder="Añadir nota..." style="flex:1;" onkeydown="if(event.key==='Enter')addNota('${id}')">
         <button class="btn btn-secondary btn-sm" onclick="addNota('${id}')">Añadir</button>
       </div>
     </div>`;
 
-  document.getElementById('detalle-body').innerHTML = fotos + camposBadges + grid + contacto + desc + notasHtml;
+  document.getElementById('detalle-body').innerHTML = portalLink + camposBadges + grid + contacto + desc + notasHtml;
   document.getElementById('detalle-footer').innerHTML = `
+    <button class="btn btn-secondary" onclick="generarPromptBusqueda('${id}')">🔍 Buscar en portales</button>
     <button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button>
-    <button class="btn btn-primary" onclick="closeModal('modal-detalle');openEditModal('${id}')">✏️ Editar</button>
+    <button class="btn btn-primary admin-only" onclick="closeModal('modal-detalle');openEditModal('${id}')">✏️ Editar</button>
   `;
   openModal('modal-detalle');
 }
 
-function addNota(id) {
+function generarPromptBusqueda(id) {
+  const i = inmuebles.find(x => x.id === id);
+  if (!i) return;
+  const partes = [];
+  if (i.direccion) partes.push(i.direccion);
+  if (i.metros) partes.push(i.metros+'m²');
+  if (i.precio) partes.push(fmt(i.precio)+'€');
+  if (i.habitaciones) partes.push(i.habitaciones+' habitaciones');
+  const prompt = `Busca si este inmueble está publicado en portales inmobiliarios: ${partes.join(', ')}. Busca en Idealista, Fotocasa y Pisos.com y dime la URL si lo encuentras.`;
+  navigator.clipboard.writeText(prompt).then(() => {
+    showToast('Prompt copiado — pégalo en claude.ai con búsqueda web activada');
+  }).catch(() => {
+    prompt_fallback(prompt);
+  });
+}
+
+function prompt_fallback(text) {
+  window.prompt('Copia este texto y pégalo en claude.ai:', text);
+}
+
+async function addNota(id) {
   const input = document.getElementById('nota-input');
   const texto = input.value.trim();
   if (!texto) return;
@@ -1877,7 +2161,7 @@ function addNota(id) {
   if (!i) return;
   if (!i.notas) i.notas = [];
   i.notas.push({ texto, fecha: new Date().toISOString() });
-  save();
+  await dbUpsertInmueble(i);
   input.value = '';
   // re-render notas
   const list = document.getElementById('detalle-notas-list');
@@ -1885,13 +2169,13 @@ function addNota(id) {
   showToast('Nota añadida');
 }
 
-function changeEstado(id) {
+async function changeEstado(id) {
   const i = inmuebles.find(x => x.id === id);
   if (!i) return;
   const estados = ['disponible','reservado','negociacion','vendido'];
   const next = estados[(estados.indexOf(i.estado)+1) % estados.length];
   i.estado = next;
-  save();
+  await dbUpsertInmueble(i);
   renderInmueblesTable();
   showToast('Estado cambiado a: ' + next);
 }
@@ -1943,7 +2227,7 @@ function previewJSON() {
     </div>`;
 }
 
-function importJSON() {
+async function importJSON() {
   const raw = document.getElementById('json-paste').value.trim();
   if (!raw) { showToast('Pega el JSON primero', 'error'); return; }
   let data;
@@ -1956,10 +2240,10 @@ function importJSON() {
   const fechaManual = document.getElementById('fecha-publicacion').value;
   const now = new Date().toISOString();
 
-  let added = 0;
+  const nuevos = [];
   data.forEach(item => {
     if (!item.direccion && !item.descripcion) return;
-    const nuevo = {
+    nuevos.push({
       id: genId(),
       tipo: item.tipo || 'piso',
       operacion: item.operacion || 'venta',
@@ -1977,14 +2261,18 @@ function importJSON() {
       grupo: item.grupo || null,
       fechaPublicacion: item.fechaPublicacion || fechaManual || null,
       fechaSubida: now,
-      fotos: item.fotos || [],
+      fotos: [],
       notas: []
-    };
-    inmuebles.push(nuevo);
-    added++;
+    });
   });
 
-  save();
+  if (!nuevos.length) { showToast('No se encontraron inmuebles válidos', 'error'); return; }
+
+  const { error } = await supabaseClient.from('inmuebles').insert(nuevos.map(mapInmuebleToDB));
+  if (error) { console.error(error); showToast('Error importando a Supabase', 'error'); return; }
+
+  inmuebles.push(...nuevos);
+  const added = nuevos.length;
   document.getElementById('json-paste').value = '';
   document.getElementById('json-preview').innerHTML = '';
   showToast(`${added} inmuebles importados ✓`);
@@ -2000,18 +2288,23 @@ function copyPrompt() {
 // DELETE
 // ============================================================
 function confirmDeleteAll(type) {
-  const word = type === 'inmuebles' ? 'BORRAR' : 'BORRAR';
   document.getElementById('confirm-title').textContent = type === 'inmuebles' ? 'Borrar todos los inmuebles' : 'Borrar todos los clientes';
   document.getElementById('confirm-desc').textContent = `Esta acción es irreversible. Para confirmar, escribe la palabra BORRAR en el campo.`;
   document.getElementById('confirm-input').value = '';
   document.getElementById('confirm-input').placeholder = 'Escribe BORRAR para confirmar';
-  document.getElementById('confirm-ok-btn').onclick = () => {
+  document.getElementById('confirm-ok-btn').onclick = async () => {
     if (document.getElementById('confirm-input').value.trim() !== 'BORRAR') {
       showToast('Escribe la palabra correcta', 'error'); return;
     }
-    if (type === 'inmuebles') { inmuebles = []; renderInmueblesTable(); }
-    else { clientes = []; renderClientesTable(); }
-    save();
+    if (type === 'inmuebles') {
+      const ok = await dbDeleteAllInmuebles();
+      if (!ok) return;
+      inmuebles = []; renderInmueblesTable();
+    } else {
+      const ok = await dbDeleteAllClientes();
+      if (!ok) return;
+      clientes = []; renderClientesTable();
+    }
     closeModal('modal-confirm');
     showToast('Eliminado todo ✓');
   };
@@ -2026,12 +2319,13 @@ function confirmDeleteOne(id) {
   document.getElementById('confirm-desc').textContent = `Vas a eliminar "${shortName}". Esta acción no se puede deshacer. Escribe ELIMINAR para confirmar.`;
   document.getElementById('confirm-input').value = '';
   document.getElementById('confirm-input').placeholder = 'Escribe ELIMINAR para confirmar';
-  document.getElementById('confirm-ok-btn').onclick = () => {
+  document.getElementById('confirm-ok-btn').onclick = async () => {
     if (document.getElementById('confirm-input').value.trim() !== 'ELIMINAR') {
       showToast('Escribe ELIMINAR para confirmar', 'error'); return;
     }
+    const ok = await dbDeleteInmueble(id);
+    if (!ok) return;
     inmuebles = inmuebles.filter(x => x.id !== id);
-    save();
     closeModal('modal-confirm');
     renderInmueblesTable();
     showToast('Inmueble eliminado');
@@ -2046,12 +2340,13 @@ function confirmDeleteCliente(id) {
   document.getElementById('confirm-desc').textContent = `Vas a eliminar a "${c.nombre}". Escribe ELIMINAR para confirmar.`;
   document.getElementById('confirm-input').value = '';
   document.getElementById('confirm-input').placeholder = 'Escribe ELIMINAR para confirmar';
-  document.getElementById('confirm-ok-btn').onclick = () => {
+  document.getElementById('confirm-ok-btn').onclick = async () => {
     if (document.getElementById('confirm-input').value.trim() !== 'ELIMINAR') {
       showToast('Escribe ELIMINAR para confirmar', 'error'); return;
     }
+    const ok = await dbDeleteCliente(id);
+    if (!ok) return;
     clientes = clientes.filter(x => x.id !== id);
-    save();
     closeModal('modal-confirm');
     renderClientesTable();
     showToast('Cliente eliminado');
@@ -2155,7 +2450,7 @@ async function geocodeAndPlot(inmueble, onDone) {
         inmueble._lat = parseFloat(data[0].lat);
         inmueble._lng = parseFloat(data[0].lon);
         inmueble._approx = qi > 0; // si usó query alternativa = aproximado
-        save();
+        dbUpsertInmueble(inmueble); // guarda coords en segundo plano, sin bloquear el mapa
         plotMarker(inmueble, inmueble._lat, inmueble._lng, inmueble._approx);
         if (onDone) onDone();
         return;
@@ -2237,8 +2532,9 @@ function renderClientesTable() {
               </div>`).join('')}
           </div>` : ''}
           <div class="client-card-footer">
-            <button class="btn btn-secondary btn-sm" onclick="openEditClienteModal('${c.id}')">✏️ Editar</button>
-            <button class="btn btn-danger btn-sm" onclick="confirmDeleteCliente('${c.id}')">🗑</button>
+            <button class="btn btn-secondary btn-sm" onclick="openPerfilCliente('${c.id}')">👤 Ver perfil</button>
+            <button class="btn btn-secondary btn-sm admin-only" onclick="openEditClienteModal('${c.id}')">✏️ Editar</button>
+            <button class="btn btn-danger btn-sm admin-only" onclick="confirmDeleteCliente('${c.id}')">🗑</button>
           </div>
         </div>`;
     }).join('')}</div>`;
@@ -2278,6 +2574,7 @@ function toggleClienteDropdown(e, id) {
   div.style.top = (rect.bottom + window.scrollY) + 'px';
   div.style.right = (document.body.clientWidth - rect.right) + 'px';
   div.innerHTML = `
+    <button class="dropdown-item" onclick="openPerfilCliente('${id}');closeDropdown()">👤 Ver perfil</button>
     <button class="dropdown-item" onclick="openEditClienteModal('${id}');closeDropdown()">✏️ Editar</button>
     <button class="dropdown-item danger" onclick="confirmDeleteCliente('${id}');closeDropdown()">🗑 Eliminar</button>
   `;
@@ -2288,12 +2585,14 @@ function toggleClienteDropdown(e, id) {
 function openAddClienteModal() {
   editingClienteId = null;
   document.getElementById('modal-cliente-title').textContent = 'Nuevo cliente';
-  ['nombre','telefono','email','presupuesto','zona','notas'].forEach(f => {
+  ['nombre','telefono','email','presupuesto','presupuesto-min','metros-min','hab-min','zona','notas'].forEach(f => {
     const el = document.getElementById('c-'+f);
     if (el) el.value = '';
   });
-  document.getElementById('c-tipo').value = 'piso';
+  document.getElementById('c-tipo').value = 'cualquiera';
   document.getElementById('c-operacion').value = 'venta';
+  document.getElementById('c-garaje').value = 'indiferente';
+  document.getElementById('c-estado-pref').value = 'cualquiera';
   openModal('modal-cliente');
 }
 
@@ -2306,14 +2605,19 @@ function openEditClienteModal(id) {
   document.getElementById('c-telefono').value = c.telefono||'';
   document.getElementById('c-email').value = c.email||'';
   document.getElementById('c-presupuesto').value = c.presupuesto||'';
-  document.getElementById('c-tipo').value = c.tipo||'piso';
+  document.getElementById('c-presupuesto-min').value = c.presupuestoMin||'';
+  document.getElementById('c-metros-min').value = c.metrosMin||'';
+  document.getElementById('c-hab-min').value = c.habMin||'';
+  document.getElementById('c-tipo').value = c.tipo||'cualquiera';
   document.getElementById('c-operacion').value = c.operacion||'venta';
+  document.getElementById('c-garaje').value = c.garaje||'indiferente';
+  document.getElementById('c-estado-pref').value = c.estadoPref||'cualquiera';
   document.getElementById('c-zona').value = c.zona||'';
   document.getElementById('c-notas').value = c.notas||'';
   openModal('modal-cliente');
 }
 
-function saveCliente() {
+async function saveCliente() {
   const nombre = document.getElementById('c-nombre').value.trim();
   if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
   const data = {
@@ -2321,36 +2625,244 @@ function saveCliente() {
     telefono: document.getElementById('c-telefono').value||null,
     email: document.getElementById('c-email').value||null,
     presupuesto: parseFloat(document.getElementById('c-presupuesto').value)||null,
+    presupuestoMin: parseFloat(document.getElementById('c-presupuesto-min').value)||null,
+    metrosMin: parseFloat(document.getElementById('c-metros-min').value)||null,
+    habMin: parseInt(document.getElementById('c-hab-min').value)||null,
     tipo: document.getElementById('c-tipo').value,
     operacion: document.getElementById('c-operacion').value,
+    garaje: document.getElementById('c-garaje').value,
+    estadoPref: document.getElementById('c-estado-pref').value,
     zona: document.getElementById('c-zona').value||null,
     notas: document.getElementById('c-notas').value||null
   };
   if (editingClienteId) {
     const idx = clientes.findIndex(x => x.id === editingClienteId);
+    data.id = editingClienteId;
+    data.fechaSubida = clientes[idx].fechaSubida;
     clientes[idx] = {...clientes[idx], ...data};
   } else {
     data.id = genId();
     data.fechaSubida = new Date().toISOString();
     clientes.push(data);
   }
-  save();
+  const ok = await dbUpsertCliente(data);
+  if (!ok) return;
   closeModal('modal-cliente');
   renderClientesTable();
   showToast(editingClienteId ? 'Cliente actualizado' : 'Cliente añadido ✓');
 }
 
 // ============================================================
-// MATCHING
+// PERFIL CLIENTE
 // ============================================================
-function getMatches(cliente) {
-  return inmuebles.filter(i => {
-    if (i.estado === 'vendido') return false;
-    if (cliente.operacion !== 'ambas' && i.operacion !== cliente.operacion) return false;
-    if (cliente.tipo && cliente.tipo !== 'cualquiera' && i.tipo !== cliente.tipo) return false;
-    if (cliente.presupuesto && i.precio && i.precio > cliente.presupuesto * 1.1) return false;
-    return true;
+function openPerfilCliente(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+
+  const initials = (c.nombre||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  const scoredMatches = scoreMatches(c);
+
+  document.getElementById('perfil-cliente-titulo').textContent = c.nombre;
+  document.getElementById('perfil-cliente-sub').textContent =
+    `${c.operacion === 'venta' ? 'Comprador' : c.operacion === 'alquiler' ? 'Inquilino' : 'Comprador/Inquilino'} · ${scoredMatches.length} inmuebles compatibles`;
+
+  const requisitos = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
+      <div class="detail-item"><div class="detail-item-label">Presupuesto máx.</div><div class="detail-item-value">${c.presupuesto ? fmt(c.presupuesto)+'€' : 'Sin límite'}</div></div>
+      ${c.presupuestoMin ? `<div class="detail-item"><div class="detail-item-label">Presupuesto mín.</div><div class="detail-item-value">${fmt(c.presupuestoMin)}€</div></div>` : ''}
+      <div class="detail-item"><div class="detail-item-label">Tipo inmueble</div><div class="detail-item-value">${c.tipo||'Cualquiera'}</div></div>
+      <div class="detail-item"><div class="detail-item-label">Operación</div><div class="detail-item-value">${c.operacion === 'venta' ? 'Compra' : c.operacion === 'alquiler' ? 'Alquiler' : 'Ambas'}</div></div>
+      ${c.metrosMin ? `<div class="detail-item"><div class="detail-item-label">Metros mínimos</div><div class="detail-item-value">${c.metrosMin}m²</div></div>` : ''}
+      ${c.habMin ? `<div class="detail-item"><div class="detail-item-label">Habitaciones mín.</div><div class="detail-item-value">${c.habMin} hab.</div></div>` : ''}
+      <div class="detail-item"><div class="detail-item-label">Garaje</div><div class="detail-item-value">${c.garaje === 'si' ? 'Necesita garaje' : 'Indiferente'}</div></div>
+      <div class="detail-item"><div class="detail-item-label">Estado pref.</div><div class="detail-item-value">${c.estadoPref === 'cualquiera' ? 'Cualquiera' : c.estadoPref}</div></div>
+      ${c.zona ? `<div class="detail-item"><div class="detail-item-label">Zona</div><div class="detail-item-value">${c.zona}</div></div>` : ''}
+    </div>
+    ${c.notas ? `<div style="background:var(--bg);border-radius:7px;padding:12px;margin-bottom:16px;font-size:13px;color:var(--text2);border-left:3px solid var(--accent);">
+      <strong>Preferencias:</strong> ${c.notas}
+    </div>` : ''}`;
+
+  const contacto = `
+    <div style="display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap;">
+      ${c.telefono ? `<a href="tel:${c.telefono}" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--accent);text-decoration:none;background:var(--bg);padding:8px 14px;border-radius:7px;border:1px solid var(--border);">📞 ${c.telefono}</a>` : ''}
+      ${c.telefono ? `<a href="https://wa.me/${c.telefono.replace(/\D/g,'')}" target="_blank" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--green);text-decoration:none;background:var(--bg);padding:8px 14px;border-radius:7px;border:1px solid var(--border);">💬 WhatsApp</a>` : ''}
+      ${c.email ? `<a href="mailto:${c.email}" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);text-decoration:none;background:var(--bg);padding:8px 14px;border-radius:7px;border:1px solid var(--border);">✉️ ${c.email}</a>` : ''}
+    </div>`;
+
+  // Matches con score
+  const matchesHtml = scoredMatches.length ? `
+    <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">
+      Inmuebles compatibles (${scoredMatches.length}) — ordenados por compatibilidad
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${scoredMatches.map(({inmueble: i, score, motivos, avisos}) => {
+        const pct = Math.min(100, Math.round(score));
+        const color = pct >= 80 ? '#2A7A4B' : pct >= 60 ? '#D47A1A' : '#6B4E8A';
+        return `
+          <div style="border:1px solid var(--border);border-radius:9px;overflow:hidden;">
+            <div style="padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;" onclick="closeModal('modal-perfil-cliente');openDetail('${i.id}')">
+              ${i.fotos&&i.fotos.length ? `<img src="${i.fotos[0]}" style="width:60px;height:50px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : `<div style="width:60px;height:50px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${tipoIcon(i.tipo)}</div>`}
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.direccion||'Sin dirección'}</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:2px;">${tipoIcon(i.tipo)} ${i.tipo} · ${i.metros||'—'}m² · ${i.habitaciones||'—'} hab · ${i.banos||'—'} baños${i.planta?' · '+i.planta:''}</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px;">${motivos.join(' · ')}</div>
+                ${avisos.length ? `<div style="font-size:10px;color:var(--orange);margin-top:2px;">⚠️ ${avisos.join(' · ')}</div>` : ''}
+              </div>
+              <div style="flex-shrink:0;text-align:right;">
+                <div style="font-size:16px;font-weight:700;color:var(--accent);">${i.precio?fmt(i.precio)+'€'+(i.operacion==='alquiler'?'/mes':''):'—'}</div>
+                <div style="margin-top:6px;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="flex:1;background:var(--border);border-radius:3px;height:5px;width:60px;">
+                      <div style="background:${color};height:5px;border-radius:3px;width:${pct}%;"></div>
+                    </div>
+                    <span style="font-size:11px;font-weight:600;color:${color};">${pct}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }).join('')}
+    </div>` : `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Sin inmuebles compatibles con este perfil</div>`;
+
+  document.getElementById('perfil-cliente-body').innerHTML = contacto + requisitos + matchesHtml;
+  document.getElementById('perfil-cliente-footer').innerHTML = `
+    <button class="btn btn-secondary" onclick="closeModal('modal-perfil-cliente')">Cerrar</button>
+    <button class="btn btn-primary" onclick="closeModal('modal-perfil-cliente');openEditClienteModal('${id}')">✏️ Editar perfil</button>`;
+
+  openModal('modal-perfil-cliente');
+}
+
+// ============================================================
+// MATCHING CON PUNTUACIÓN
+// ============================================================
+
+// Devuelve array de {inmueble, score(0-100), motivos[], avisos[]} ordenado desc
+function scoreMatches(cliente) {
+  const resultados = [];
+
+  inmuebles.forEach(i => {
+    if (i.estado === 'vendido') return;
+
+    let score = 0;
+    const motivos = [];
+    const avisos = [];
+    let descalificado = false;
+
+    // --- CRITERIOS ELIMINATORIOS (descalifican si no se cumplen) ---
+
+    // Operación — si el cliente quiere solo venta y el inmueble es alquiler, fuera
+    if (cliente.operacion !== 'ambas' && i.operacion !== cliente.operacion) {
+      descalificado = true;
+    }
+
+    // Tipo — si no es cualquiera y no coincide, fuera
+    if (cliente.tipo && cliente.tipo !== 'cualquiera' && i.tipo !== cliente.tipo) {
+      descalificado = true;
+    }
+
+    // Presupuesto máximo — más de un 15% por encima, fuera
+    if (cliente.presupuesto && i.precio && i.precio > cliente.presupuesto * 1.15) {
+      descalificado = true;
+    }
+
+    // Habitaciones mínimas — si tiene menos de las requeridas, fuera
+    if (cliente.habMin && i.habitaciones && i.habitaciones < cliente.habMin) {
+      descalificado = true;
+    }
+
+    // Metros mínimos — si tiene menos, fuera
+    if (cliente.metrosMin && i.metros && i.metros < cliente.metrosMin * 0.85) {
+      descalificado = true;
+    }
+
+    // Garaje obligatorio
+    if (cliente.garaje === 'si' && i.garaje === 'no') {
+      descalificado = true;
+    }
+
+    if (descalificado) return;
+
+    // --- PUNTUACIÓN POR CRITERIOS (suma hasta 100) ---
+
+    // Precio (30 pts) — cuanto más ajustado al presupuesto, mejor
+    if (i.precio && cliente.presupuesto) {
+      const pct = i.precio / cliente.presupuesto;
+      if (pct <= 0.8) { score += 20; motivos.push('Precio bajo presupuesto'); }
+      else if (pct <= 0.95) { score += 30; motivos.push('Precio ideal'); }
+      else if (pct <= 1.05) { score += 25; motivos.push('Precio ajustado'); }
+      else if (pct <= 1.15) { score += 15; avisos.push('Ligeramente sobre presupuesto'); }
+    } else if (!i.precio) {
+      score += 15; // precio desconocido, no penalizar
+    } else {
+      score += 20;
+    }
+
+    // Zona (25 pts)
+    if (cliente.zona && i.direccion) {
+      const zonas = cliente.zona.toLowerCase().split(/[,;\/]/).map(z => z.trim()).filter(z => z);
+      const dirLow = i.direccion.toLowerCase();
+      const zonaMatch = zonas.some(z => dirLow.includes(z));
+      if (zonaMatch) { score += 25; motivos.push('Zona preferida ✓'); }
+      else { score += 5; avisos.push('Fuera de zona preferida'); }
+    } else {
+      score += 15; // sin restricción de zona
+    }
+
+    // Metros (15 pts)
+    if (i.metros && cliente.metrosMin) {
+      const extra = i.metros - cliente.metrosMin;
+      if (extra >= 20) { score += 15; motivos.push(`${i.metros}m² (+${extra}m² sobre mínimo)`); }
+      else if (extra >= 0) { score += 12; motivos.push(`${i.metros}m² (cumple mínimo)`); }
+      else { score += 8; avisos.push(`${i.metros}m² (algo justo)`); }
+    } else if (i.metros) {
+      score += 10;
+    }
+
+    // Habitaciones (15 pts)
+    if (i.habitaciones && cliente.habMin) {
+      if (i.habitaciones > cliente.habMin) { score += 15; motivos.push(`${i.habitaciones} hab. (más de las pedidas)`); }
+      else { score += 12; motivos.push(`${i.habitaciones} hab. (cumple)`); }
+    } else if (i.habitaciones) {
+      score += 8;
+    }
+
+    // Garaje (5 pts)
+    if (cliente.garaje === 'si' && i.garaje === 'si') {
+      score += 5; motivos.push('Garaje incluido ✓');
+    } else if (cliente.garaje === 'indiferente' && i.garaje === 'si') {
+      score += 3; motivos.push('Con garaje');
+    }
+
+    // Estado (5 pts)
+    if (cliente.estadoPref && cliente.estadoPref !== 'cualquiera') {
+      const descLow = (i.descripcion||'').toLowerCase();
+      if (cliente.estadoPref === 'reformado' && (descLow.includes('reform') || descLow.includes('renovad') || descLow.includes('nuevo'))) {
+        score += 5; motivos.push('Reformado ✓');
+      } else if (cliente.estadoPref === 'reformar' && (descLow.includes('reforma') || descLow.includes('potenci') || descLow.includes('sin reformar'))) {
+        score += 5; motivos.push('Para reformar ✓');
+      }
+    }
+
+    // Palabras clave de las notas del cliente (5 pts)
+    if (cliente.notas && i.descripcion) {
+      const kw = cliente.notas.toLowerCase().split(/[\s,]+/).filter(w => w.length > 4);
+      const descLow = i.descripcion.toLowerCase();
+      const hits = kw.filter(w => descLow.includes(w));
+      if (hits.length >= 2) { score += 5; motivos.push('Coincide con preferencias'); }
+      else if (hits.length === 1) { score += 2; }
+    }
+
+    if (motivos.length === 0) motivos.push('Compatible');
+
+    resultados.push({ inmueble: i, score, motivos, avisos });
   });
+
+  return resultados.sort((a, b) => b.score - a.score);
+}
+
+// Versión simplificada para dashboard y tarjetas
+function getMatches(cliente) {
+  return scoreMatches(cliente).map(r => r.inmueble);
 }
 
 function renderMatching() {
@@ -2359,28 +2871,65 @@ function renderMatching() {
       `<div class="empty-state"><div class="empty-state-icon">🎯</div><div class="empty-state-text">Sin clientes</div><div class="empty-state-sub">Añade clientes en la sección CRM</div></div>`;
     return;
   }
+  if (!inmuebles.length) {
+    document.getElementById('matching-content').innerHTML =
+      `<div class="empty-state"><div class="empty-state-icon">🏠</div><div class="empty-state-text">Sin inmuebles</div><div class="empty-state-sub">Importa inmuebles primero</div></div>`;
+    return;
+  }
 
   document.getElementById('matching-content').innerHTML = clientes.map(c => {
-    const matches = getMatches(c);
+    const scored = scoreMatches(c);
+    const top = scored.slice(0, 4);
     return `
-      <div style="margin-bottom:20px;border:1px solid var(--border);border-radius:9px;overflow:hidden;">
-        <div style="background:var(--surface2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <span style="font-weight:600;">👤 ${c.nombre}</span>
-            <span style="font-size:12px;color:var(--text2);margin-left:10px;">${c.tipo} · ${c.operacion} · ${c.presupuesto?fmt(c.presupuesto)+'€ máx':'sin límite'}</span>
-          </div>
-          <span class="badge ${matches.length ? 'badge-green' : 'badge-gray'}">${matches.length} matches</span>
-        </div>
-        ${matches.length ? `<div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px;">
-          ${matches.slice(0,5).map(i => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg);border-radius:7px;">
-              <div>
-                <div style="font-size:13px;font-weight:500;">${i.direccion||'Sin dirección'}</div>
-                <div style="font-size:11px;color:var(--text3);">${tipoIcon(i.tipo)} ${i.tipo} · ${i.metros||'—'}m²</div>
+      <div style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="background:var(--surface2);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">
+              ${(c.nombre||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
+            </div>
+            <div>
+              <div style="font-weight:600;font-size:14px;">${c.nombre}</div>
+              <div style="font-size:11px;color:var(--text2);">
+                ${c.tipo&&c.tipo!=='cualquiera'?c.tipo+' · ':''} 
+                ${c.operacion==='venta'?'Compra':c.operacion==='alquiler'?'Alquiler':'Compra/Alquiler'} · 
+                ${c.presupuesto?'hasta '+fmt(c.presupuesto)+'€':'sin límite'} 
+                ${c.zona?'· '+c.zona:''}
               </div>
-              <div style="font-size:14px;font-weight:700;color:var(--accent);">${i.precio?fmt(i.precio)+'€':'—'}</div>
-            </div>`).join('')}
-        </div>` : `<div style="padding:12px 16px;font-size:12px;color:var(--text3);">Sin coincidencias con los inmuebles disponibles</div>`}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge ${scored.length ? 'badge-green' : 'badge-gray'}">${scored.length} compatibles</span>
+            <button class="btn btn-secondary btn-sm" onclick="openPerfilCliente('${c.id}')">Ver perfil completo →</button>
+          </div>
+        </div>
+        ${top.length ? `
+          <div style="padding:14px 18px;">
+            <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">Top ${top.length} coincidencias</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${top.map(({inmueble: i, score, motivos, avisos}) => {
+                const pct = Math.min(100, Math.round(score));
+                const color = pct >= 80 ? '#2A7A4B' : pct >= 60 ? '#D47A1A' : '#6B4E8A';
+                return `
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);cursor:pointer;" onclick="openDetail('${i.id}')">
+                    ${i.fotos&&i.fotos.length?`<img src="${i.fotos[0]}" style="width:48px;height:40px;object-fit:cover;border-radius:5px;flex-shrink:0;">`:`<div style="width:48px;height:40px;background:var(--surface2);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:18px;">${tipoIcon(i.tipo)}</div>`}
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.direccion||'Sin dirección'}</div>
+                      <div style="font-size:11px;color:var(--text3);">${motivos.slice(0,3).join(' · ')}${avisos.length?' · ⚠️'+avisos[0]:''}</div>
+                    </div>
+                    <div style="flex-shrink:0;text-align:right;">
+                      <div style="font-size:14px;font-weight:700;color:var(--accent);">${i.precio?fmt(i.precio)+'€'+(i.operacion==='alquiler'?'/mes':''):'—'}</div>
+                      <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">
+                        <div style="background:var(--border);border-radius:2px;height:4px;width:50px;">
+                          <div style="background:${color};height:4px;border-radius:2px;width:${pct}%;"></div>
+                        </div>
+                        <span style="font-size:10px;font-weight:600;color:${color};">${pct}%</span>
+                      </div>
+                    </div>
+                  </div>`;
+              }).join('')}
+            </div>
+            ${scored.length > 4 ? `<div style="text-align:center;margin-top:10px;"><button class="btn btn-secondary btn-sm" onclick="openPerfilCliente('${c.id}')">Ver los ${scored.length} inmuebles compatibles →</button></div>` : ''}
+          </div>` : `<div style="padding:14px 18px;font-size:12px;color:var(--text3);">Sin inmuebles compatibles con este perfil. Revisa los criterios del cliente.</div>`}
       </div>`;
   }).join('');
 }
@@ -2513,9 +3062,7 @@ function closeLightbox() {
 // INIT
 // ============================================================
 window.onload = () => {
-  load();
-
-  // Load Leaflet
+  // Load Leaflet siempre (lo necesitaremos tras login)
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
@@ -2525,7 +3072,13 @@ window.onload = () => {
   script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
   document.head.appendChild(script);
 
-  renderDashboard();
+  // ¿Ya había sesión abierta en este navegador?
+  const savedRole = sessionStorage.getItem('proptrack_role');
+  if (savedRole === 'admin' || savedRole === 'vista') {
+    userRole = savedRole;
+    enterApp();
+  }
+  // si no hay sesión, se queda en la pantalla de login hasta que el usuario entre
 };
 
 // Close dropdowns on outside click
