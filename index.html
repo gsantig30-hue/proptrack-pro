@@ -2994,39 +2994,23 @@ function openPerfilCliente(id) {
 
   // Matches con score
   const matchesHtml = scoredMatches.length ? `
-    <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">
-      Inmuebles compatibles (${scoredMatches.length}) — ordenados por compatibilidad
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;">
+        Inmuebles compatibles (${scoredMatches.length})
+      </div>
+      <div style="display:flex;gap:5px;align-items:center;">
+        <span style="font-size:11px;color:var(--text3);">Ordenar:</span>
+        <button onclick="reorderMatches('${c.id}','compatibilidad')" id="sort-compat-${c.id}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;background:var(--accent);color:#fff;">🎯 Compatibilidad</button>
+        <button onclick="reorderMatches('${c.id}','precio-asc')" id="sort-pasc-${c.id}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;">💰↑</button>
+        <button onclick="reorderMatches('${c.id}','precio-desc')" id="sort-pdesc-${c.id}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;">💰↓</button>
+        <button onclick="reorderMatches('${c.id}','ofrecidos')" id="sort-ofr-${c.id}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;">✅ Ofrecidos</button>
+      </div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      ${scoredMatches.map(({inmueble: i, score, motivos, avisos}) => {
-        const pct = Math.min(100, Math.round(score));
-        const color = pct >= 80 ? '#2A7A4B' : pct >= 60 ? '#D47A1A' : '#6B4E8A';
-        return `
-          <div style="border:1px solid var(--border);border-radius:9px;overflow:hidden;">
-            <div style="padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;" onclick="closeModal('modal-perfil-cliente');openDetail('${i.id}')">
-              ${i.fotos&&i.fotos.length ? `<img src="${i.fotos[0]}" style="width:60px;height:50px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : `<div style="width:60px;height:50px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${tipoIcon(i.tipo)}</div>`}
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.direccion||'Sin dirección'}</div>
-                <div style="font-size:11px;color:var(--text2);margin-top:2px;">${tipoIcon(i.tipo)} ${i.tipo} · ${i.metros||'—'}m² · ${i.habitaciones||'—'} hab · ${i.banos||'—'} baños${i.planta?' · '+i.planta:''}</div>
-                <div style="font-size:11px;color:var(--text3);margin-top:2px;">${motivos.join(' · ')}</div>
-                ${avisos.length ? `<div style="font-size:10px;color:var(--orange);margin-top:2px;">⚠️ ${avisos.join(' · ')}</div>` : ''}
-              </div>
-              <div style="flex-shrink:0;text-align:right;">
-                <div style="font-size:16px;font-weight:700;color:var(--accent);">${i.precio?fmt(i.precio)+'€'+(i.operacion==='alquiler'?'/mes':''):'—'}</div>
-                <div style="margin-top:6px;">
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <div style="flex:1;background:var(--border);border-radius:3px;height:5px;width:60px;">
-                      <div style="background:${color};height:5px;border-radius:3px;width:${pct}%;"></div>
-                    </div>
-                    <span style="font-size:11px;font-weight:600;color:${color};">${pct}%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>`;
-      }).join('')}
+    <div id="matches-list-${c.id}" style="display:flex;flex-direction:column;gap:10px;">
+      ${renderMatchCards(c.id, scoredMatches)}
     </div>` : `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Sin inmuebles compatibles con este perfil</div>`;
 
+  _currentPerfilMatches[c.id] = scoredMatches;
   document.getElementById('perfil-cliente-body').innerHTML = contacto + requisitos + matchesHtml;
   document.getElementById('perfil-cliente-footer').innerHTML = `
     <button class="btn btn-secondary" onclick="closeModal('modal-perfil-cliente')">Cerrar</button>
@@ -3040,6 +3024,103 @@ function openPerfilCliente(id) {
 // ============================================================
 
 // Devuelve array de {inmueble, score(0-100), motivos[], avisos[]} ordenado desc
+// ============================================================
+// MATCH CARDS: renderizado y reordenación
+// ============================================================
+
+function getOfrecidoKey(clienteId, inmuebleId) {
+  return 'ofrecido_' + clienteId + '_' + inmuebleId;
+}
+
+function toggleOfrecido(clienteId, inmuebleId, cb) {
+  const key = getOfrecidoKey(clienteId, inmuebleId);
+  const val = cb.checked;
+  localStorage.setItem(key, val ? '1' : '0');
+  // Resalta la tarjeta visualmente
+  const card = document.getElementById('match-card-' + clienteId + '-' + inmuebleId);
+  if (card) {
+    card.style.borderColor = val ? 'var(--green)' : 'var(--border)';
+    card.style.background = val ? 'color-mix(in srgb, var(--green) 6%, var(--surface))' : '';
+  }
+}
+
+function renderMatchCards(clienteId, scoredMatches) {
+  return scoredMatches.map(({inmueble: i, score, motivos, avisos}) => {
+    const pct = Math.min(100, Math.round(score));
+    const color = pct >= 80 ? '#2A7A4B' : pct >= 60 ? '#D47A1A' : '#6B4E8A';
+    const ofrecido = localStorage.getItem(getOfrecidoKey(clienteId, i.id)) === '1';
+    const borderColor = ofrecido ? 'var(--green)' : 'var(--border)';
+    const bgColor = ofrecido ? 'color-mix(in srgb, var(--green) 6%, var(--surface))' : '';
+    return `
+      <div id="match-card-${clienteId}-${i.id}" style="border:1px solid ${borderColor};border-radius:9px;overflow:hidden;background:${bgColor};">
+        <div style="padding:12px 14px;display:flex;gap:12px;align-items:center;">
+          <div style="cursor:pointer;display:flex;gap:12px;align-items:center;flex:1;min-width:0;" onclick="closeModal('modal-perfil-cliente');openDetail('${i.id}')">
+            ${i.fotos&&i.fotos.length ? `<img src="${i.fotos[0]}" style="width:60px;height:50px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : `<div style="width:60px;height:50px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${tipoIcon(i.tipo)}</div>`}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.direccion||'Sin dirección'}</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px;">${tipoIcon(i.tipo)} ${i.tipo} · ${i.metros||'—'}m² · ${i.habitaciones||'—'} hab · ${i.banos||'—'} baños${i.planta?' · '+i.planta:''}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px;">${motivos.join(' · ')}</div>
+              ${avisos.length ? `<div style="font-size:10px;color:var(--orange);margin-top:2px;">⚠️ ${avisos.join(' · ')}</div>` : ''}
+            </div>
+          </div>
+          <div style="flex-shrink:0;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+            <div style="font-size:16px;font-weight:700;color:var(--accent);">${i.precio?fmt(i.precio)+'€'+(i.operacion==='alquiler'?'/mes':''):'—'}</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="flex:1;background:var(--border);border-radius:3px;height:5px;width:60px;">
+                <div style="background:${color};height:5px;border-radius:3px;width:${pct}%;"></div>
+              </div>
+              <span style="font-size:11px;font-weight:600;color:${color};">${pct}%</span>
+            </div>
+            <label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;font-weight:600;color:${ofrecido?'var(--green)':'var(--text2)'};background:var(--bg);border:1px solid var(--border);padding:3px 8px;border-radius:5px;">
+              <input type="checkbox" ${ofrecido?'checked':''} onchange="toggleOfrecido('${clienteId}','${i.id}',this)" style="accent-color:var(--green);cursor:pointer;">
+              Ofrecido
+            </label>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Guarda los scoredMatches del perfil abierto para poder reordenar sin recalcular
+let _currentPerfilMatches = {};
+
+function reorderMatches(clienteId, criterio) {
+  const matches = _currentPerfilMatches[clienteId];
+  if (!matches) return;
+
+  // Actualiza estilos de botones
+  ['compat','pasc','pdesc','ofr'].forEach(k => {
+    const btn = document.getElementById('sort-' + k + '-' + clienteId);
+    if (btn) { btn.style.background = ''; btn.style.color = ''; }
+  });
+  const activeMap = {compatibilidad:'compat','precio-asc':'pasc','precio-desc':'pdesc',ofrecidos:'ofr'};
+  const activeBtn = document.getElementById('sort-' + activeMap[criterio] + '-' + clienteId);
+  if (activeBtn) { activeBtn.style.background = 'var(--accent)'; activeBtn.style.color = '#fff'; }
+
+  let sorted = [...matches];
+  if (criterio === 'compatibilidad') {
+    sorted.sort((a, b) => {
+      const aP = (a.inmueble.origen||'propio') === 'propio';
+      const bP = (b.inmueble.origen||'propio') === 'propio';
+      if (aP !== bP) return aP ? -1 : 1;
+      return b.score - a.score;
+    });
+  } else if (criterio === 'precio-asc') {
+    sorted.sort((a, b) => (a.inmueble.precio||0) - (b.inmueble.precio||0));
+  } else if (criterio === 'precio-desc') {
+    sorted.sort((a, b) => (b.inmueble.precio||0) - (a.inmueble.precio||0));
+  } else if (criterio === 'ofrecidos') {
+    sorted.sort((a, b) => {
+      const aO = localStorage.getItem(getOfrecidoKey(clienteId, a.inmueble.id)) === '1' ? 1 : 0;
+      const bO = localStorage.getItem(getOfrecidoKey(clienteId, b.inmueble.id)) === '1' ? 1 : 0;
+      return bO - aO;
+    });
+  }
+
+  const list = document.getElementById('matches-list-' + clienteId);
+  if (list) list.innerHTML = renderMatchCards(clienteId, sorted);
+}
+
 function scoreMatches(cliente) {
   const resultados = [];
 
