@@ -962,8 +962,9 @@
       <div class="card">
         <div class="import-tabs">
           <button class="import-tab active" onclick="switchImportTab(0)">📦 Subir .zip WhatsApp</button>
-          <button class="import-tab" onclick="switchImportTab(1)">🤖 Pegar JSON de Claude</button>
-          <button class="import-tab" onclick="switchImportTab(2)">📋 Prompt para Claude</button>
+          <button class="import-tab" onclick="switchImportTab(1)">🏠 Importar inmuebles</button>
+          <button class="import-tab" onclick="switchImportTab(2)">👤 Importar demandas</button>
+          <button class="import-tab" onclick="switchImportTab(3)">📋 Prompt para Claude</button>
         </div>
 
         <div class="import-panel active" id="import-panel-0">
@@ -979,7 +980,7 @@
         </div>
 
         <div class="import-panel" id="import-panel-1">
-          <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Pega aquí el JSON que te devuelve Claude. También puedes añadir manualmente la fecha de publicación del mensaje original.</p>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Pega aquí el JSON de inmuebles que te devuelve Claude (el array <code>inmuebles</code> del resultado).</p>
           <textarea class="json-textarea" id="json-paste" placeholder='[{"tipo":"piso","operacion":"venta",...}]'></textarea>
           <div style="margin:12px 0;display:flex;gap:10px;align-items:center;">
             <label style="font-size:12px;font-weight:600;color:var(--text2);">📅 Fecha publicación en grupo (opcional):</label>
@@ -994,14 +995,37 @@
         </div>
 
         <div class="import-panel" id="import-panel-2">
-          <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Copia este prompt, ve a claude.ai, pégalo y añade el texto del chat al final.</p>
-          <div class="prompt-box">Eres un extractor de datos inmobiliarios. Te voy a pegar el contenido de un chat de WhatsApp de un grupo inmobiliario. Analiza todos los mensajes y extrae cada inmueble que encuentres. Para cada uno devuelve un objeto JSON con estos campos exactos:
+          <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Pega aquí el JSON de demandas/clientes que te devuelve Claude (el array <code>clientes</code> del resultado).</p>
+          <textarea class="json-textarea" id="json-paste-clientes" placeholder='[{"nombre":"Juan García","telefono":"+34 600 000 000",...}]'></textarea>
+          <div style="display:flex;gap:10px;margin-top:8px;">
+            <button class="btn btn-secondary" onclick="previewJSONClientes()">👁 Vista previa</button>
+            <button class="btn btn-primary" onclick="importJSONClientes()">✅ Confirmar e importar clientes</button>
+          </div>
+          <div id="json-preview-clientes" style="margin-top:16px;"></div>
+        </div>
 
+        <div class="import-panel" id="import-panel-3">
+          <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Copia este prompt, ve a claude.ai, pégalo y añade el texto del chat al final.</p>
+          <div class="prompt-box">Eres un extractor de datos inmobiliarios a partir de chats de WhatsApp de grupos del sector inmobiliario.
+
+Analiza TODOS los mensajes del chat y clasifícalos en dos categorías:
+
+1. INMUEBLES: mensajes donde alguien OFRECE o PUBLICA una propiedad (piso, local, edificio, terreno, garaje, oficina...).
+2. CLIENTES: mensajes donde alguien BUSCA o DEMANDA una propiedad para comprar o alquilar.
+
+Devuelve un único objeto JSON con dos arrays:
+
+{
+  "inmuebles": [...],
+  "clientes": [...]
+}
+
+Para cada INMUEBLE devuelve estos campos exactos:
 tipo (piso / edificio / terreno / local / garaje / oficina)
 operacion (venta / alquiler)
 estado (disponible)
 precio (número sin puntos ni €, o null)
-direccion (texto)
+direccion (texto, lo más completo posible incluyendo barrio y ciudad)
 metros (número o null)
 habitaciones (número o null)
 banos (número o null)
@@ -1012,8 +1036,23 @@ contactoNombre (quien envió el mensaje)
 descripcion (resumen del mensaje original)
 fechaPublicacion (fecha en formato YYYY-MM-DD del mensaje original, o null)
 grupo (pon "Chat - Sector Inmobiliario")
+offMarket (true si en el mensaje aparece "off market", "off-market", "fuera de mercado", "exclusiva", "sin publicar", "no está en portal", "no publicado" o similar; false en caso contrario)
 
-Devuelve SOLO un array JSON válido, sin texto adicional, sin explicaciones, sin bloques de código. Si no encuentras inmuebles claros, devuelve [].
+Para cada CLIENTE/DEMANDA devuelve estos campos exactos:
+nombre (nombre de quien envía el mensaje buscando)
+telefono (con prefijo +34 si es español, o null)
+presupuesto (presupuesto máximo, número sin puntos ni €, o null)
+presupuestoMin (presupuesto mínimo si se menciona, o null)
+tipo (piso / edificio / terreno / local / garaje / oficina / cualquiera)
+operacion (venta / alquiler / ambas)
+metrosMin (metros mínimos pedidos, número o null)
+habMin (habitaciones mínimas pedidas, número o null)
+garaje (si / no / indiferente)
+zona (zonas o barrios preferidos, texto separado por comas, o null)
+notas (resumen de sus preferencias adicionales)
+
+Devuelve SOLO el objeto JSON válido, sin texto adicional, sin explicaciones, sin bloques de código markdown.
+Si no hay inmuebles, devuelve "inmuebles": []. Si no hay clientes, devuelve "clientes": [].
 
 El chat es el siguiente:
 [PEGA AQUÍ EL TEXTO DEL CHAT]</div>
@@ -1055,9 +1094,11 @@ El chat es el siguiente:
             <option value="vendido">Vendido</option>
           </select>
           <select class="filter-select" onchange="filterInmuebles()" id="filter-origen">
-            <option value="">Propios y exportados</option>
+            <option value="">Todos los orígenes</option>
             <option value="propio">🏠 Propio</option>
+            <option value="colaborador">🤝 Colaborador</option>
             <option value="exportado">📦 Exportado WhatsApp</option>
+            <option value="offmarket">🤫 Off Market</option>
           </select>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
             <div class="view-toggle">
@@ -1261,12 +1302,27 @@ El chat es el siguiente:
           <input type="text" class="form-input" id="f-grupo" placeholder="Chat - Sector Inmobiliario">
         </div>
         <div class="form-group">
+          <label class="form-label">Origen del inmueble</label>
+          <select class="form-select" id="f-origen" onchange="toggleColaboradorField()">
+            <option value="propio">🏠 Propio</option>
+            <option value="colaborador">🤝 De colaborador</option>
+          </select>
+        </div>
+        <div class="form-group" id="f-colaborador-group" style="display:none;">
+          <label class="form-label">Nombre del colaborador</label>
+          <input type="text" class="form-input" id="f-colaborador" placeholder="Nombre del colaborador">
+        </div>
+        <div class="form-group">
           <label class="form-label">📅 Fecha publicación en grupo</label>
           <input type="date" class="form-input" id="f-fechaPublicacion">
         </div>
         <div class="form-group form-full">
           <label class="form-label">🔗 URL del portal (Idealista, Fotocasa...)</label>
           <input type="text" class="form-input" id="f-urlPortal" placeholder="https://www.idealista.com/inmueble/...">
+        </div>
+        <div class="form-group form-full" style="display:flex;align-items:center;gap:12px;">
+          <input type="checkbox" id="f-offMarket" style="width:18px;height:18px;cursor:pointer;">
+          <label for="f-offMarket" class="form-label" style="margin:0;cursor:pointer;">🤫 Off Market (no publicado en portales)</label>
         </div>
         <div class="form-group form-full">
           <label class="form-label">Descripción</label>
@@ -1607,6 +1663,8 @@ function mapInmuebleFromDB(row) {
     descripcion: row.descripcion,
     grupo: row.grupo,
     origen: row.origen || 'propio',
+    colaborador: row.colaborador || null,
+    offMarket: row.off_market || false,
     fechaPublicacion: row.fecha_publicacion,
     fechaSubida: row.fecha_subida,
     notas: row.notas || [],
@@ -1657,6 +1715,8 @@ function mapInmuebleToDB(i) {
     descripcion: i.descripcion,
     grupo: i.grupo,
     origen: i.origen || 'propio',
+    colaborador: i.colaborador || null,
+    off_market: i.offMarket || false,
     fecha_publicacion: i.fechaPublicacion || null,
     fecha_subida: i.fechaSubida || new Date().toISOString(),
     notas: i.notas || [],
@@ -1912,10 +1972,20 @@ function opBadge(op) {
     : '<span class="badge badge-purple">Alquiler</span>';
 }
 
-function origenBadge(o) {
-  return o === 'exportado'
-    ? '<span class="badge badge-gray">📦 Exportado</span>'
-    : '<span class="badge badge-orange">🏠 Propio</span>';
+function toggleColaboradorField() {
+  const val = document.getElementById('f-origen')?.value;
+  const group = document.getElementById('f-colaborador-group');
+  if (group) group.style.display = val === 'colaborador' ? '' : 'none';
+}
+
+function origenBadge(o, colaborador) {
+  if (o === 'exportado') return '<span class="badge badge-gray">📦 Exportado</span>';
+  if (o === 'colaborador') return `<span class="badge badge-purple">🤝 ${colaborador ? colaborador : 'Colaborador'}</span>`;
+  return '<span class="badge badge-orange">🏠 Propio</span>';
+}
+
+function offMarketBadge(offMarket) {
+  return offMarket ? '<span class="badge badge-red">🤫 Off Market</span>' : '';
 }
 
 function genId() { return Date.now() + Math.random().toString(36).slice(2); }
@@ -1935,7 +2005,8 @@ function renderInmueblesTable() {
     if (tipo && i.tipo !== tipo) return false;
     if (op && i.operacion !== op) return false;
     if (estado && i.estado !== estado) return false;
-    if (origen && (i.origen||'propio') !== origen) return false;
+    if (origen === 'offmarket') { if (!i.offMarket) return false; }
+    else if (origen && (i.origen||'propio') !== origen) return false;
     return true;
   });
 
@@ -1965,7 +2036,7 @@ function renderInmueblesTable() {
               ${i.planta ? `<span>🏢 ${i.planta}</span>` : ''}
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              ${estadoBadge(i.estado)} ${opBadge(i.operacion)} ${origenBadge(i.origen)}
+              ${estadoBadge(i.estado)} ${opBadge(i.operacion)} ${origenBadge(i.origen, i.colaborador)} ${offMarketBadge(i.offMarket)}
               ${i.garaje==='si' ? '<span class="badge badge-green">🅿️ Garaje</span>' : ''}
               ${i.fotos&&i.fotos.length ? `<span class="badge badge-gray">📸 ${i.fotos.length}</span>` : ''}
             </div>
@@ -1997,6 +2068,7 @@ function renderInmueblesTable() {
         <th>Estado</th>
         <th>Operación</th>
         <th>Origen</th>
+        <th>Off M.</th>
         <th>📅 Publicado</th>
         <th>📥 Subido</th>
         <th></th>
@@ -2014,7 +2086,8 @@ function renderInmueblesTable() {
             <td>${i.habitaciones||'—'} / ${i.banos||'—'}</td>
             <td>${estadoBadge(i.estado)}</td>
             <td>${opBadge(i.operacion)}</td>
-            <td>${origenBadge(i.origen)}</td>
+            <td>${origenBadge(i.origen, i.colaborador)}</td>
+            <td>${offMarketBadge(i.offMarket)}</td>
             <td><span class="fecha-badge">${fmtDate(i.fechaPublicacion)}</span></td>
             <td><span class="fecha-badge">${fmtDate(i.fechaSubida)}</span></td>
             <td class="relative" onclick="event.stopPropagation()">
@@ -2101,6 +2174,11 @@ function openEditModal(id) {
   document.getElementById('f-descripcion').value = i.descripcion||'';
   document.getElementById('f-fechaPublicacion').value = i.fechaPublicacion||'';
   document.getElementById('f-urlPortal').value = i.urlPortal||'';
+  document.getElementById('f-offMarket').checked = i.offMarket||false;
+  const origenVal = i.origen === 'exportado' ? 'propio' : (i.origen||'propio');
+  document.getElementById('f-origen').value = origenVal;
+  document.getElementById('f-colaborador').value = i.colaborador||'';
+  toggleColaboradorField();
   openModal('modal-inmueble');
 }
 
@@ -2125,19 +2203,25 @@ async function saveInmueble() {
     descripcion: document.getElementById('f-descripcion').value||null,
     fechaPublicacion: document.getElementById('f-fechaPublicacion').value||null,
     urlPortal: document.getElementById('f-urlPortal').value||null,
+    offMarket: document.getElementById('f-offMarket').checked,
     fotos: []
   };
+
+  const origenForm = document.getElementById('f-origen').value;
+  const colaboradorForm = document.getElementById('f-colaborador').value.trim();
 
   if (editingId) {
     const idx = inmuebles.findIndex(x => x.id === editingId);
     data.id = editingId;
     data.fechaSubida = inmuebles[idx].fechaSubida;
-    data.origen = inmuebles[idx].origen || 'propio';
+    data.origen = origenForm;
+    data.colaborador = origenForm === 'colaborador' ? colaboradorForm || null : null;
     inmuebles[idx] = {...inmuebles[idx], ...data};
   } else {
     data.id = genId();
     data.fechaSubida = new Date().toISOString();
-    data.origen = 'propio';
+    data.origen = origenForm;
+    data.colaborador = origenForm === 'colaborador' ? colaboradorForm || null : null;
     inmuebles.push(data);
   }
   const ok = await dbUpsertInmueble(data);
@@ -2167,7 +2251,7 @@ function openDetail(id) {
 
   const camposBadges = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-      ${estadoBadge(i.estado)} ${opBadge(i.operacion)} ${origenBadge(i.origen)}
+      ${estadoBadge(i.estado)} ${opBadge(i.operacion)} ${origenBadge(i.origen, i.colaborador)} ${offMarketBadge(i.offMarket)}
       ${i.garaje==='si' ? '<span class="badge badge-green">🅿️ Garaje</span>' : ''}
     </div>`;
 
@@ -2317,7 +2401,9 @@ async function importJSON() {
   let data;
   try {
     const clean = raw.replace(/```json|```/g,'').trim();
-    data = JSON.parse(clean);
+    const parsed = JSON.parse(clean);
+    // Acepta tanto array directo como el nuevo formato {inmuebles:[...], clientes:[...]}
+    data = Array.isArray(parsed) ? parsed : (parsed.inmuebles || []);
   } catch(e) { showToast('JSON inválido', 'error'); return; }
   if (!Array.isArray(data)) { showToast('El JSON debe ser un array []', 'error'); return; }
 
@@ -2344,6 +2430,8 @@ async function importJSON() {
       descripcion: item.descripcion || null,
       grupo: item.grupo || null,
       origen: 'exportado',
+      colaborador: null,
+      offMarket: item.offMarket === true || item.off_market === true || false,
       fechaPublicacion: item.fechaPublicacion || fechaManual || null,
       fechaSubida: now,
       fotos: [],
@@ -2368,6 +2456,69 @@ async function importJSON() {
 function copyPrompt() {
   const text = document.querySelector('.prompt-box').textContent;
   navigator.clipboard.writeText(text).then(() => showToast('Prompt copiado al portapapeles ✓'));
+}
+
+function previewJSONClientes() {
+  const raw = document.getElementById('json-paste-clientes').value.trim();
+  if (!raw) { showToast('Pega el JSON primero', 'error'); return; }
+  let data;
+  try {
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    data = Array.isArray(parsed) ? parsed : (parsed.clientes || []);
+  } catch(e) { showToast('JSON inválido', 'error'); return; }
+  if (!data.length) { showToast('No se encontraron clientes en el JSON', 'error'); return; }
+  const prev = document.getElementById('json-preview-clientes');
+  prev.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">${data.length} cliente(s) encontrado(s):</div>` +
+    data.map(c => `<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:12px;">
+      <strong>${c.nombre||'Sin nombre'}</strong> · ${c.telefono||'—'} · 
+      ${c.tipo||'cualquiera'} · ${c.operacion||'venta'} · 
+      ${c.presupuesto ? 'hasta '+c.presupuesto+'€' : 'sin presupuesto'} 
+      ${c.zona ? '· '+c.zona : ''}
+    </div>`).join('');
+}
+
+async function importJSONClientes() {
+  const raw = document.getElementById('json-paste-clientes').value.trim();
+  if (!raw) { showToast('Pega el JSON primero', 'error'); return; }
+  let data;
+  try {
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    data = Array.isArray(parsed) ? parsed : (parsed.clientes || []);
+  } catch(e) { showToast('JSON inválido', 'error'); return; }
+  if (!data.length) { showToast('No se encontraron clientes válidos', 'error'); return; }
+
+  const now = new Date().toISOString();
+  const nuevos = data.filter(c => c.nombre).map(c => ({
+    id: genId(),
+    nombre: c.nombre,
+    telefono: c.telefono || null,
+    email: c.email || null,
+    presupuesto: c.presupuesto ? parseFloat(c.presupuesto) : null,
+    presupuestoMin: c.presupuestoMin ? parseFloat(c.presupuestoMin) : null,
+    tipo: c.tipo || 'cualquiera',
+    operacion: c.operacion || 'venta',
+    metrosMin: c.metrosMin ? parseFloat(c.metrosMin) : null,
+    habMin: c.habMin ? parseInt(c.habMin) : null,
+    garaje: c.garaje || 'indiferente',
+    estadoPref: c.estadoPref || 'cualquiera',
+    zona: c.zona || null,
+    notas: c.notas || null,
+    fechaSubida: now
+  }));
+
+  if (!nuevos.length) { showToast('No se encontraron clientes con nombre válido', 'error'); return; }
+
+  const { error } = await supabaseClient.from('clientes').insert(nuevos.map(mapClienteToDB));
+  if (error) { console.error(error); showToast('Error importando clientes a Supabase', 'error'); return; }
+
+  clientes.push(...nuevos);
+  document.getElementById('json-paste-clientes').value = '';
+  document.getElementById('json-preview-clientes').innerHTML = '';
+  showToast(`${nuevos.length} clientes importados ✓`);
+  renderClientesTable();
+  setTimeout(checkNuevosMatches, 1600);
 }
 
 // ============================================================
@@ -3064,7 +3215,7 @@ function renderMatching() {
                   <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid ${esDebil?'#E0B8B8':'var(--border)'};cursor:pointer;" onclick="openDetail('${i.id}')">
                     ${i.fotos&&i.fotos.length?`<img src="${i.fotos[0]}" style="width:48px;height:40px;object-fit:cover;border-radius:5px;flex-shrink:0;">`:`<div style="width:48px;height:40px;background:var(--surface2);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:18px;">${tipoIcon(i.tipo)}</div>`}
                     <div style="flex:1;min-width:0;">
-                      <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.direccion||'Sin dirección'} ${origenBadge(i.origen)}</div>
+                      <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.direccion||'Sin dirección'} ${origenBadge(i.origen, i.colaborador)}</div>
                       <div style="font-size:11px;color:var(--text3);">${motivos.slice(0,3).join(' · ')}</div>
                       ${avisos.length ? `<div style="font-size:11px;color:#B33A3A;margin-top:2px;">⚠️ ${avisos.slice(0, esDebil ? avisos.length : 1).join(' · ')}</div>` : ''}
                     </div>
