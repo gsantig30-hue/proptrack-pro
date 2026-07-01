@@ -1143,6 +1143,12 @@ El chat es el siguiente:
       <div class="table-wrap">
         <div class="table-toolbar">
           <input class="search-input" placeholder="🔍 Buscar cliente..." oninput="filterClientes()" id="search-clientes">
+          <select id="clientes-sort" onchange="renderClientesTable()" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text1);cursor:pointer;">
+            <option value="fecha">📅 Recientes primero</option>
+            <option value="matches">🎯 Más matches primero</option>
+            <option value="nombre">🔤 Nombre A-Z</option>
+            <option value="presupuesto">💰 Mayor presupuesto</option>
+          </select>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
             <div class="view-toggle">
               <button class="view-btn active" id="view-btn-cli-table" onclick="setClientesView('table')">☰ Lista</button>
@@ -2739,6 +2745,21 @@ function plotMarker(i, lat, lng, approx) {
 function renderClientesTable() {
   const q = (document.getElementById('search-clientes')?.value||'').toLowerCase();
   let filtered = clientes.filter(c => !q || (c.nombre||'').toLowerCase().includes(q) || (c.zona||'').toLowerCase().includes(q));
+  const sortBy = document.getElementById('clientes-sort')?.value || 'fecha';
+  if (sortBy === 'matches') {
+    filtered.sort((a, b) => getMatches(b).length - getMatches(a).length);
+  } else if (sortBy === 'nombre') {
+    filtered.sort((a, b) => (a.nombre||'').localeCompare(b.nombre||''));
+  } else if (sortBy === 'presupuesto') {
+    filtered.sort((a, b) => (b.presupuesto||0) - (a.presupuesto||0));
+  } else {
+    // fecha: más recientes primero (por fechaPublicacion o fechaSubida)
+    filtered.sort((a, b) => {
+      const da = a.fechaPublicacion || a.fechaSubida || '';
+      const db = b.fechaPublicacion || b.fechaSubida || '';
+      return db.localeCompare(da);
+    });
+  }
   const container = document.getElementById('clientes-table-body');
 
   if (!filtered.length) {
