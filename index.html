@@ -1692,6 +1692,8 @@ function mapClienteFromDB(row) {
     estadoPref: row.estado_pref,
     zona: row.zona,
     notas: row.notas,
+    grupo: row.grupo || null,
+    fechaPublicacion: row.fecha_publicacion || null,
     fechaSubida: row.fecha_subida
   };
 }
@@ -1743,6 +1745,8 @@ function mapClienteToDB(c) {
     estado_pref: c.estadoPref,
     zona: c.zona,
     notas: c.notas,
+    grupo: c.grupo || null,
+    fecha_publicacion: c.fechaPublicacion || null,
     fecha_subida: c.fechaSubida || new Date().toISOString()
   };
 }
@@ -2505,6 +2509,8 @@ async function importJSONClientes() {
     estadoPref: c.estadoPref || 'cualquiera',
     zona: c.zona || null,
     notas: c.notas || null,
+    grupo: c.grupo || null,
+    fechaPublicacion: c.fechaPublicacion || null,
     fechaSubida: now
   }));
 
@@ -2760,6 +2766,9 @@ function renderClientesTable() {
           ${c.telefono ? `<div class="client-card-row"><span>Teléfono</span><strong><a href="tel:${c.telefono}" style="color:var(--accent);text-decoration:none;">${c.telefono}</a></strong></div>` : ''}
           ${c.email ? `<div class="client-card-row"><span>Email</span><strong style="font-size:11px;">${c.email}</strong></div>` : ''}
           ${c.notas ? `<div style="margin-top:10px;font-size:12px;color:var(--text2);font-style:italic;border-top:1px solid var(--border);padding-top:8px;">${c.notas}</div>` : ''}
+          ${c.grupo || c.fechaPublicacion ? `<div style="margin-top:8px;font-size:11px;color:var(--text3);">
+            ${c.grupo ? `📦 ${c.grupo}` : ''} ${c.fechaPublicacion ? `· 📅 ${fmtDate(c.fechaPublicacion)}` : ''}
+          </div>` : ''}
           ${m.length ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
             <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Top matches</div>
             ${m.slice(0,2).map(i => `
@@ -2781,7 +2790,7 @@ function renderClientesTable() {
   // TABLE VIEW
   container.innerHTML = `
     <table>
-      <thead><tr><th>Nombre</th><th>Teléfono</th><th>Presupuesto</th><th>Busca</th><th>Zona</th><th>Matches</th><th></th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Teléfono</th><th>Presupuesto</th><th>Busca</th><th>Zona</th><th>Grupo / Fecha</th><th>Matches</th><th></th></tr></thead>
       <tbody>${filtered.map(c => {
         const m = getMatches(c).length;
         return `<tr>
@@ -2790,6 +2799,11 @@ function renderClientesTable() {
           <td style="font-weight:600;">${c.presupuesto ? fmt(c.presupuesto)+'€' : '—'}</td>
           <td>${c.tipo||'—'} · ${c.operacion||'—'}</td>
           <td>${c.zona||'—'}</td>
+          <td style="font-size:11px;color:var(--text2);">
+            ${c.grupo ? `<div>${c.grupo}</div>` : ''}
+            ${c.fechaPublicacion ? `<span class="fecha-badge">${fmtDate(c.fechaPublicacion)}</span>` : ''}
+            ${!c.grupo && !c.fechaPublicacion ? '—' : ''}
+          </td>
           <td>${m ? `<span class="badge badge-green">${m} matches</span>` : '<span class="badge badge-gray">0</span>'}</td>
           <td class="relative">
             <button class="action-dots" onclick="toggleClienteDropdown(event,'${c.id}')">⋮</button>
@@ -2923,10 +2937,14 @@ async function saveCliente() {
     const idx = clientes.findIndex(x => x.id === editingClienteId);
     data.id = editingClienteId;
     data.fechaSubida = clientes[idx].fechaSubida;
+    data.grupo = clientes[idx].grupo || null;
+    data.fechaPublicacion = clientes[idx].fechaPublicacion || null;
     clientes[idx] = {...clientes[idx], ...data};
   } else {
     data.id = genId();
     data.fechaSubida = new Date().toISOString();
+    data.grupo = null;
+    data.fechaPublicacion = null;
     clientes.push(data);
   }
   const ok = await dbUpsertCliente(data);
