@@ -1165,7 +1165,17 @@ El chat es el siguiente:
     <!-- MATCHING -->
     <div class="panel" id="panel-matching">
       <div class="card">
-        <div class="card-title">Matching automático cliente ↔ inmueble</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div class="card-title" style="margin:0;">Matching automático cliente ↔ inmueble</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:var(--text3);">Ordenar por:</span>
+            <select id="matching-sort" onchange="renderMatching()" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text1);cursor:pointer;">
+              <option value="matches">🎯 Más matches primero</option>
+              <option value="nombre">🔤 Nombre A-Z</option>
+              <option value="presupuesto">💰 Mayor presupuesto</option>
+            </select>
+          </div>
+        </div>
         <div id="matching-content"></div>
       </div>
     </div>
@@ -2003,6 +2013,48 @@ function genId() { return Date.now() + Math.random().toString(36).slice(2); }
 // ============================================================
 // INMUEBLES TABLE
 // ============================================================
+// ============================================================
+// DETECCIÓN DE DUPLICADOS ENTRE GRUPOS
+// ============================================================
+
+function detectaDuplicado(inmueble, lista) {
+  // Busca en la lista un inmueble con misma dirección similar + precio ±10% + metros ±10%
+  // pero de un grupo DISTINTO. Devuelve el inmueble duplicado o null.
+  if (!inmueble.grupo) return null; // solo aplica a los que vienen de un grupo
+
+  const dirA = (inmueble.direccion||'').toLowerCase().replace(/[^a-záéíóúüñ0-9]/g,' ').trim();
+  if (!dirA || dirA.length < 5) return null;
+
+  // Palabras clave de la dirección (ignora preposiciones cortas)
+  const palabrasA = dirA.split(/\s+/).filter(w => w.length > 3);
+  if (!palabrasA.length) return null;
+
+  return lista.find(otro => {
+    if (otro.id === inmueble.id) return false;
+    if (!otro.grupo || otro.grupo === inmueble.grupo) return false; // mismo grupo → no es duplicado
+
+    // Dirección: al menos 2 palabras clave en común
+    const dirB = (otro.direccion||'').toLowerCase().replace(/[^a-záéíóúüñ0-9]/g,' ').trim();
+    const palabrasB = dirB.split(/\s+/).filter(w => w.length > 3);
+    const coincidencias = palabrasA.filter(w => palabrasB.includes(w));
+    if (coincidencias.length < 2) return false;
+
+    // Precio ±10%
+    if (inmueble.precio && otro.precio) {
+      const diff = Math.abs(inmueble.precio - otro.precio) / Math.max(inmueble.precio, otro.precio);
+      if (diff > 0.10) return false;
+    }
+
+    // Metros ±10% (si ambos los tienen)
+    if (inmueble.metros && otro.metros) {
+      const diff = Math.abs(inmueble.metros - otro.metros) / Math.max(inmueble.metros, otro.metros);
+      if (diff > 0.10) return false;
+    }
+
+    return true;
+  }) || null;
+}
+
 function renderInmueblesTable() {
   const q = (document.getElementById('search-inmuebles')?.value||'').toLowerCase();
   const tipo = document.getElementById('filter-tipo')?.value||'';
@@ -2049,6 +2101,7 @@ function renderInmueblesTable() {
               ${estadoBadge(i.estado)} ${opBadge(i.operacion)} ${origenBadge(i.origen, i.colaborador)} ${offMarketBadge(i.offMarket)}
               ${i.garaje==='si' ? '<span class="badge badge-green">🅿️ Garaje</span>' : ''}
               ${i.fotos&&i.fotos.length ? `<span class="badge badge-gray">📸 ${i.fotos.length}</span>` : ''}
+              ${(() => { const dup = detectaDuplicado(i, inmuebles); return dup ? `<span title="También en '${dup.grupo}'" style="cursor:help;background:#FFF3CD;color:#856404;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #FFCA2C;">⚠️ otro grupo</span>` : ''; })()}
             </div>
           </div>
           <div class="prop-card-footer">
@@ -2087,8 +2140,11 @@ function renderInmueblesTable() {
         ${sorted.map(i => `
           <tr style="cursor:pointer;" onclick="openDetail('${i.id}')">
             <td>${tipoIcon(i.tipo)} <span style="text-transform:capitalize">${i.tipo}</span></td>
-            <td style="max-width:200px;">
-              <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.direccion||'—'}</div>
+            <td style="max-width:220px;">
+              <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px;">
+                ${i.direccion||'—'}
+                ${(() => { const dup = detectaDuplicado(i, inmuebles); return dup ? `<span title="⚠️ También en '${dup.grupo}'" style="cursor:help;flex-shrink:0;background:#FFF3CD;color:#856404;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;border:1px solid #FFCA2C;">⚠️ otro grupo</span>` : ''; })()}
+              </div>
               ${i.grupo ? `<div style="font-size:10px;color:var(--text3);">${i.grupo}</div>` : ''}
             </td>
             <td style="font-weight:600;color:var(--accent);white-space:nowrap;">${i.precio ? fmt(i.precio)+'€'+(i.operacion==='alquiler'?'/mes':'') : '—'}</td>
@@ -3298,7 +3354,16 @@ function renderMatching() {
     return;
   }
 
-  document.getElementById('matching-content').innerHTML = clientes.map(c => {
+  const matchingSort = document.getElementById('matching-sort')?.value || 'matches';
+  let clientesSorted = [...clientes];
+  if (matchingSort === 'matches') {
+    clientesSorted.sort((a, b) => getMatches(b).length - getMatches(a).length);
+  } else if (matchingSort === 'nombre') {
+    clientesSorted.sort((a, b) => (a.nombre||'').localeCompare(b.nombre||''));
+  } else if (matchingSort === 'presupuesto') {
+    clientesSorted.sort((a, b) => (b.presupuesto||0) - (a.presupuesto||0));
+  }
+  document.getElementById('matching-content').innerHTML = clientesSorted.map(c => {
     const scored = scoreMatches(c);
     const top = scored; // ya viene limitado a 10, propios primero
     return `
